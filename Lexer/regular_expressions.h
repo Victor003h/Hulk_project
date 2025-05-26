@@ -5,6 +5,8 @@ class RE
 {
     public:
         std::set<char> alphabet;
+        TokenType type;
+
     public:
         RE(std::set<char> alphabet)
         {
@@ -32,7 +34,7 @@ class EmptyRE:public RE
 
 };
 
-class EpsilonRE:public RE
+class EpsilonRE:public RE 
 {
     public:
         EpsilonRE():RE{{'$'}}
@@ -46,8 +48,6 @@ class EpsilonRE:public RE
         NFA ConvertToNFA() override{
             return NFA::epsilonRE();
         }
-
-    
 };
 
 class SymbolRE:public RE
@@ -66,7 +66,6 @@ class SymbolRE:public RE
         NFA ConvertToNFA() override{
             return NFA::symbolRE(symbol);
         }
-
 };
 
 
@@ -126,6 +125,7 @@ class ConcatenationRE:public RE
 };
 
 
+
 class ClousureRE:public RE
 {
     private:
@@ -149,3 +149,5 @@ class ClousureRE:public RE
         }
 
 };
+
+

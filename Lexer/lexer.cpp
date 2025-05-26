@@ -3,82 +3,13 @@
 #include <iostream>
 #include "regular_expressions.h"
 #include <map>
-enum TokenType {
-    Number,
-    EOFs,
-    Identifier,
-    Plus,
-    Minus,
-    Multiply,
-    Divide,
-    Modulo,
-    LeftParen,
-    RightParen,
-    LeftBrace,
-    RightBrace,
-    OpenBracket,
-    CloseBracket,
-    Semicolon,
-    Comma,
-    Dot,
-    Assignment,   // =
-    Equal,        // ==
-    NotEqual,     // !=
-    Less,
-    LessEqual,
-    Greater,
-    GreaterEqual,
-    And,
-    Or,
-    Not,
-    If,
-    Else,
-    For,
-    While,
-    Break,
-    Switch,
-    Case,
-    Default,
-    LogicalAnd,
-    LogicalOr,
-    LogicalNot,
-    Continue,
-    Return,
-    Error,
-    // Puedes agregar más tokens según lo requiera tu lenguaje
-};
-
-
-struct Token{
-    
-    std::string lexeme;
-    TokenType type;
-    int row,col;
-
-    Token(std::string lexeme,TokenType type,int row,int col)
-    {
-        this->lexeme=lexeme;
-        this->col=col;
-        this->type=type;
-        this->row=row;
-    }
-    std::string to_string() const 
-    {
-        std::stringstream ss;
-        ss << "Token(";
-        ss << "lexeme: \"" << lexeme << "\", ";
-        ss << "row: "    << row << ", ";
-        ss << "col: "    << col;
-        ss << ")";
-        return ss.str();
-    }
-};
 
 class Lexer
 {
     private:
         std::vector<pair<TokenType,std::string>>tokens_regExp;
         std::map<TokenType,DFA> automatas={};
+        DFA finaldfa;
         int currentLine=0;
         int currentCol=0;
         
@@ -89,54 +20,115 @@ class Lexer
 
             this->tokens_regExp=tokens;
             std::vector<NFA> nfas={};
+            
             for (auto pair :tokens)
             {
-                if( existAutamata(pair.first) )
+                RE* n= linear_reguex(pair.second);
+                n->type=pair.first;
+                NFA nfa= n->ConvertToNFA();
+                for(int fs:nfa.final_states)
                 {
+                    nfa.m_final_token_types[fs]=pair.first;
+                }
+                nfas.push_back(nfa);
+
+
+
+                // if( existAutamata(pair.first) )
+                // {
                     
-                    DFA* dfa = DFA::loadFromFile(getString(pair.first));
-                    automatas[pair.first]=*dfa;
-                }
-                else
-                {
-                    RE* n= linear_reguex(pair.second);
-                    NFA nfa= n->ConvertToNFA();
-                    DFA dfa=nfa.convertToDFA();
-                    dfa.saveToFile(getString(pair.first));
-                    //nfas.push_back(nfa);
-                    automatas[pair.first]=dfa;
-                }
+                //     DFA* dfa = DFA::loadFromFile(getString(pair.first));
+                //     automatas[pair.first]=*dfa;
+                // }
+                // else
+                // {
+                //     RE* n= linear_reguex(pair.second);
+                //     n->type=pair.first;
+                //     NFA nfa= n->ConvertToNFA();
+                //     for(int fs:nfa.final_states)
+                //     {
+                //         nfa.m_final_token_types[fs]=pair.first;
+                //     }
+
+                //     DFA dfa=nfa.convertToDFA();
+                //     dfa.saveToFile(getString(pair.first));
+                //     //nfas.push_back(nfa);
+                //     automatas[pair.first]=dfa;
+                // }
                
             }
-            if( existAutamata(Number) )
+
+            auto digitis_re=digits_reguex();
+            NFA nfa_d=digitis_re->ConvertToNFA();
+            for(int fs:nfa_d.final_states)
             {
-                DFA* dfa = DFA::loadFromFile(getString(Number));
-                automatas[Number]=*dfa;
+                nfa_d.m_final_token_types[fs]=Number;
             }
-            else
+            nfas.push_back(nfa_d);
+
+
+            auto identifier_re=buildIdentifierRE();
+            NFA nfa_i=identifier_re->ConvertToNFA();
+            for(int fs:nfa_i.final_states)
             {
-                auto digitis_re=digits_reguex();
-                NFA nfa_d=digitis_re->ConvertToNFA();
-                DFA dfa=nfa_d.convertToDFA();
-                dfa.saveToFile(getString(Number));
-                //nfas.push_back(nfa_d);
-                automatas[Number]= dfa;
+                nfa_i.m_final_token_types[fs]=Identifier;
+            }
+            nfas.push_back(nfa_i);
+
+
+            NFA nfa=nfas[0];
+
+            for (int i=1; i<nfas.size();i++)
+            {
+                nfa= NFA::UnionRE(nfa,nfas[i]);
             }
 
-            if( existAutamata(Identifier) )
-            {
-                DFA* dfa = DFA::loadFromFile(getString(Identifier));
-                automatas[Identifier]=*dfa;
-            }
-            else
-            {
-               auto identifier_re=buildIdentifierRE();
-                NFA nfa_i=identifier_re->ConvertToNFA();
-                DFA dfa=nfa_i.convertToDFA();
-                dfa.saveToFile(getString(Identifier));
-                //nfas.push_back(nfa_i);
-                automatas[Identifier]=dfa;
-            }
+
+
+            
+            DFA dfa= nfa.convertToDFA();
+            finaldfa=dfa;
+            
+
+
+
+            // if( existAutamata(Number) )
+            // {
+            //     DFA* dfa = DFA::loadFromFile(getString(Number));
+            //     automatas[Number]=*dfa;
+            // }
+            // else
+            // {
+            //     auto digitis_re=digits_reguex();
+            //     NFA nfa_d=digitis_re->ConvertToNFA();
+            //     for(int fs:nfa_d.final_states)
+            //     {
+            //         nfa_d.m_final_token_types[fs]=Number;
+            //     }
+            //     DFA dfa=nfa_d.convertToDFA();
+            //     dfa.saveToFile(getString(Number));
+            //     //nfas.push_back(nfa_d);
+            //     automatas[Number]= dfa;
+            // }
+
+            // if( existAutamata(Identifier) )
+            // {
+            //     DFA* dfa = DFA::loadFromFile(getString(Identifier));
+            //     automatas[Identifier]=*dfa;
+            // }
+            // else
+            // {
+            //    auto identifier_re=buildIdentifierRE();
+            //     NFA nfa_i=identifier_re->ConvertToNFA();
+            //     for(int fs:nfa_i.final_states)
+            //     {
+            //         nfa_i.m_final_token_types[fs]=Identifier;
+            //     }
+            //     DFA dfa=nfa_i.convertToDFA();
+            //     dfa.saveToFile(getString(Identifier));
+            //     //nfas.push_back(nfa_i);
+            //     automatas[Identifier]=dfa;
+            // }
 
             // NFA nfa=nfas[0];
 
@@ -298,7 +290,8 @@ class Lexer
                     continue;
                 }
                 
-                Token token= scanToken(inp,cr);
+               // Token token= scanToken(inp,cr);
+                Token token= scanToken2(inp,cr);
                 cr+=token.lexeme.length();
                 currentCol+=token.lexeme.length();
                 tokens.push_back(token);
@@ -338,6 +331,38 @@ class Lexer
             }
 
             return Token(inp.substr(cr,matched.second),matched.first,currentLine,currentCol);
+
+        }
+    
+        Token scanToken2(std::string inp,int cr)
+        {
+            std::pair<TokenType,int> matched={Error,-1};
+
+            int currentpos=cr;
+            int currentState=finaldfa.start_state;
+
+
+            while(cr <inp.length())
+            {
+                char n=inp[currentpos];
+                int nextstate=finaldfa.nextState(n,currentState);
+                if (nextstate==-1)  break;
+                currentState=nextstate;
+                currentpos++;
+        
+            }
+            if (finaldfa.is_final_state(currentState) )
+            {
+                 TokenType t=finaldfa.m_final_token_types[currentState];
+                 return Token(inp.substr(cr,currentpos-cr),t,currentLine,currentCol);
+            }
+            
+
+            
+            return Token("error",Error,this->currentLine,this->currentCol);
+            
+
+          
 
         }
     
@@ -450,8 +475,15 @@ int main()
     Lexer lexer(tokens);
 
      std::string inp=" 5 < 34 or 23.3 <= 4  ";
+    std::string inp2=R"(42;
+    print(42);
+    print((((1 + 2) ^ 3) * 4) / 5);
+    print("Hello World");
+    print("The message is \\"Hello World\\"");
+    print("The meaning of life is " @ 42);
+    print(sin(2 * PI) ^ 2 + cos(3 * PI / log(4, 64)));)";
 
-     auto toks=lexer.scanTokens(inp);
+     auto toks=lexer.scanTokens(inp2);
 
      for (auto tok: toks)
      {

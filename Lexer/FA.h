@@ -6,18 +6,20 @@
 #include <iostream>
 #include <fstream>
 #include <filesystem>
+#include "Token.cpp"
 
 using namespace std;
 
 
 class DFA
 {
-    private:
+    public:
         int start_state;
         int total_states;
         std::vector<int> final_states;
         std::set<char> alphabet;
         std::map<int, std::map<char, int>> transitions;
+        std::map<int, TokenType> m_final_token_types;
 
   
     public: DFA(int start_state,int total_states,std::vector<int> final_states,
@@ -185,16 +187,14 @@ class DFA
 
 
 class NFA{
-    private:
+    public:
 
         int start_state;
         int total_states;
         std::set<char> alphabet;
-        std::map<int, std::map<char, std::vector<int>>> transitions;
-
-    public:
-       
+        std::map<int, std::map<char, std::vector<int>>> transitions;       
         std::vector<int> final_states;
+        std::map<int, TokenType> m_final_token_types;
     
     public:
         NFA(int start_state,int total_states,std::vector<int> final_states,
@@ -317,25 +317,38 @@ class NFA{
                 queue.pop();
             }
 
-            
+            std::map<int, TokenType> dfa_final_tokens;
             std::vector<int> finalStates ={};
             for (auto pair : dfn_states)
             {
+                int dfa_state_id = pair.second;
+                bool isAccept = false;
+                TokenType token = UNKNOWN;  
                 for (int state_nfa: pair.first)
                 {
+
                     if (is_final_state(state_nfa))
                     {
+                        token=m_final_token_types[state_nfa];
+                        isAccept=true;
+
                         finalStates.push_back(pair.second);
                     }
                 }
+
+                dfa_final_tokens[dfa_state_id]=token;
+
             }
            std::set<char> d_al=alphabet;
             if(d_al.find('$')==d_al.end())  d_al.erase('$');
 
-            return DFA(0,dfn_states.size(),finalStates,alphabet,trs);
+            DFA dfa(0,dfn_states.size(),finalStates,alphabet,trs);
+            dfa.m_final_token_types=dfa_final_tokens;
+            return dfa;
 
         }
-
+        
+        
 
         std::set<int> eClousure(int state,bool initial)
         {
@@ -418,6 +431,7 @@ class NFA{
         {
             int startstate= a1.total_states+a2.total_states;
             int final_s=a1.total_states+a2.total_states+1;
+            std::vector<int> finals=a1.final_states;
             int totalstates=a1.total_states+a2.total_states+2;
 
             std::set<char> alphabet=a1.alphabet;
@@ -446,18 +460,30 @@ class NFA{
             }
             transitions[startstate]['$']={a1.start_state,a2.start_state+a1.total_states};
 
+            auto final_token_types=a1.m_final_token_types;
+            for (auto pair: a2.m_final_token_types)
+            {
+                final_token_types[pair.first+a1.total_states]=pair.second;
+            }
 
             
-            for (int fs: a1.final_states)
-            {
-                transitions[fs]['$']={final_s};
-            }
+            // for (int fs: a1.final_states)
+            // {
+            //     transitions[fs]['$']={final_s};
+            // }
+            // for (int fs: a2.final_states)
+            // {
+            //     transitions[fs+a1.total_states]['$']={final_s};
+            // }
+
             for (int fs: a2.final_states)
             {
-                transitions[fs+a1.total_states]['$']={final_s};
+                finals.push_back(fs+a1.total_states);
             }
             
-            return NFA(startstate,totalstates,{final_s},alphabet,transitions);
+            NFA res(startstate,totalstates,finals,alphabet,transitions);
+            res.m_final_token_types=final_token_types;
+            return res;
         }
     
         static NFA ConcatenationRE(NFA a1,NFA a2)
