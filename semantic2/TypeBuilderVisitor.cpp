@@ -1,62 +1,84 @@
 #include "context.h"
 #include "visitor.cpp"
+#include <stdexcept> 
 
 class TypeBuilderVisitor :public Visitor
 {
 
     public :
-    Context context;
-    Type currentType;
+        Context context;
+        Type currentType;
 
-    void visit(ProgramNode* node)
-    {
-        for(auto stmt : node->stmts)
+        
+
+        void visit(ProgramNode* node) override
         {
-            if (TypeNode* type = dynamic_cast<TypeNode*>(stmt)) {
-               visit(type);
-            }
-        };
+            for(auto stmt : node->stmts)
+            {
+                if (TypeNode* type = dynamic_cast<TypeNode*>(stmt)) {
+                visit(type);
+                }
+            };
 
-    }
-    void visit(TypeNode* node) 
-    {
-        currentType=context.GetType(node->name.lexeme);
-        for(auto atribute : node->atributes)
+        }
+       
+        void visit(TypeNode* node) override
         {
-            if (AtributeNode* type = dynamic_cast<AtributeNode*>(atribute)) {
-               visit(type);
-            }
-        };
+            currentType=context.GetType(node->name.lexeme);
+            
+            for(auto atribute : node->atributes)
+            {
+                if (AtributeNode* type = dynamic_cast<AtributeNode*>(atribute)) {
+                visit(type);
+                }
+            };
 
-        for(auto meth : node->methods)
+
+            for(auto meth : node->methods)
+            {
+                if (MethodNode* type = dynamic_cast<MethodNode*>(meth)) {
+                visit(type);
+                }
+            };
+
+        }
+
+        void visit(AtributeNode* node) override
         {
-            if (MethodNode* type = dynamic_cast<MethodNode*>(meth)) {
-               visit(type);
+
+            Type atrType=context.GetType(node->type);
+
+            currentType.DefineAtribute(node->id.lexeme,atrType);
+
+        }
+
+        void visit(MethodNode* node) override
+        {  
+            Type returnType=context.GetType(node->type);
+            std::vector<Atribute> args;
+            
+            std::vector<Atribute> arg;
+            for(auto param:node->params)
+            {
+                if (IdentifierNode* p = dynamic_cast<IdentifierNode*>(param)) {
+                args.push_back(Atribute(p->value.lexeme,p->type));
+                }
+                else
+                {
+                    throw std::runtime_error("Unexpected error in builder method  "+ node->id.lexeme);
+                }
             }
-        };
-
-    }
-
-    void visit(AtributeNode* node)
-    {
-        Type atrType=context.GetType(node->type);
-        currentType.DefineAtribute(node->id.lexeme,atrType);
-
-    }
-
-     virtual void visit(MethodNode* node)
-     {  
+            context.DefineMethod(node->id.lexeme,node->type,args);
+        };     
 
 
-     };     
-
-    virtual void visit(BlockNode* node)         = 0;
-    virtual void visit(BinaryExpression* node)  = 0;
-    virtual void visit(LiteralNode* node)         = 0;
-    virtual void visit(IdentifierNode* node)      = 0;
-    virtual void visit(IfExpression* node)        = 0;
-    virtual void visit(WhileExpression* node)     = 0;
-    virtual void visit(ForExression* node)        = 0;
-    virtual void visit(LetExpression* node)         = 0;
+        void visit(BlockNode* node)    {};
+        void visit(BinaryExpression* node)  {};
+        void visit(LiteralNode* node)         {};
+        void visit(IdentifierNode* node)     {};
+        void visit(IfExpression* node)        {};
+        void visit(WhileExpression* node)     {};
+        void visit(ForExression* node)        {};
+        void visit(LetExpression* node)       {};
 
 };

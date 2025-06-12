@@ -2,7 +2,7 @@
 #include "visitor.cpp"
 
 
-class TypeCollectorVisitor: public Visitor
+class FunctionCollectorVisitor: public Visitor
 {
     public:
     Context context;
@@ -18,20 +18,42 @@ class TypeCollectorVisitor: public Visitor
             }
         };
     }
-    void visit(TypeNode* node)  override
+  
+    
+
+    void visit(MethodNode* node)
     {
-        context.CreateType(node->name.lexeme);
+        Type returnType=context.GetType(node->type);
+        std::vector<Atribute> args;
+        for(auto param:node->params)
+        {
+            if (IdentifierNode* p = dynamic_cast<IdentifierNode*>(param)) {
+            args.push_back(Atribute(p->value.lexeme,p->type));
+            }
+            else
+            {
+                throw std::runtime_error("Unexpected error in builder method  "+ node->id.lexeme);
+            }
+        }
+        context.DefineMethod(node->id.lexeme,node->type,args);
+         
     };
 
+
+    void visit(TypeNode* node)  override {}; 
     void visit(BlockNode* node)          {};
     void visit(BinaryExpression* node)   {};
     void visit(LiteralNode* node)        {};
     void visit(IdentifierNode* node)     {}; 
     void visit(AtributeNode* node)       {};
-    void visit(MethodNode* node)         {};
+    
     void visit(IfExpression* node)       {};
     void visit(WhileExpression* node)    {};
     void visit(ForExression* node)       {};
-    void visit(LetExpression* node)      {};
-    
+    void visit(LetExpression* node)      {}; 
+
 };
+
+
+
+
