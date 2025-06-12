@@ -55,7 +55,8 @@ class SymbolRE:public RE
     private:
         char symbol;
     public:
-        SymbolRE(char symbol):RE{{symbol}}
+        SymbolRE(char symbol):
+        RE{{symbol}}
         {
             this->symbol=symbol;
         }
@@ -123,8 +124,6 @@ class ConcatenationRE:public RE
             return NFA::ConcatenationRE(a1,a2);
         }
 };
-
-
 
 class ClousureRE:public RE
 {

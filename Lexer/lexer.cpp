@@ -15,8 +15,62 @@ class Lexer
         
 
     public:
-        Lexer( std::vector<pair<TokenType,std::string>>tokens)
+        Lexer( )
         {
+
+            std::vector<std::pair<TokenType, std::string>> tokens = {
+                {TokenType::op_Modulo,       "%"},   // ("modOp", "%")
+                {TokenType::punc_at,           "@"},   // ("at", "@")
+                {TokenType::punc_doubleAt,     "@@"},  // ("doubleAt", "@@")
+                {TokenType::kw_extends,      "extends"}, // ("extends", "extends")
+                {TokenType::punc_LeftBracket,  "["},   // ("lbracket", "[")
+                {TokenType::punc_RightBracket, "]"},   // ("rbracket", "]")
+                {TokenType::punc_LeftBrace,    "{"},   // ("lbrace", "{")
+                {TokenType::punc_RightBrace,   "}"},   // ("rbrace", "}")
+                {TokenType::punc_LeftParen,    "("},   // ("lparen", "(")
+                {TokenType::punc_RightParen,   ")"},   // ("rparen", ")")
+                {TokenType::op_Greater,      ">"},   // ("greater", ">")
+                {TokenType::op_Less,         "<"},   // ("less", "<")
+                {TokenType::punc_Semicolon,    ";"},   // ("semicolon", ";")
+                {TokenType::punc_Colon,        ":"},   // ("colon", ":")
+                {TokenType::punc_Comma,        ","},   // ("comma", ",")
+                {TokenType::kw_type,         "type"},// ("type", "type")
+                {TokenType::arrow,        "=>"},  // ("arrow", "=>")
+                {TokenType::Assignment,   "="},   // ("equal", "=")
+                // Palabras clave y otros tokens de la lista original
+                {TokenType::kw_if,           "if"},        // sustituido a "if"
+                {TokenType::kw_else,         "else"},      // sustituido a "else"
+                {TokenType::kw_elif,         "elif"},
+                {TokenType::kw_protocol,     "protocol"},
+                {TokenType::kw_in,           "in"},
+                {TokenType::kw_let,          "let"},
+                {TokenType::kw_function,     "function"},
+                {TokenType::kw_inherits,     "inherits"},
+                {TokenType::kw_extends,      "extends"},   // se repite según la lista original
+                {TokenType::kw_while,        "while"},     // sustituido a "while"
+                {TokenType::kw_for,          "for"},       // sustituido a "for"
+                {TokenType::kw_true_,        "true"},
+                {TokenType::kw_false_,       "false"},
+                {TokenType::kw_new_,         "new"},
+                {TokenType::kw_null_,        "null"},
+                {TokenType::kw_is,         "is"},
+                {TokenType::kw_as,         "as"},
+                {TokenType::op_destruc,    ":="},
+                {TokenType::op_LogicalOr,    "||"},      // ("doubleOr", "||")
+                {TokenType::op_Or,           "|"},       // ("or", "|")
+                {TokenType::op_And,          "&"},       // ("and", "&")
+                {TokenType::op_Equal,        "=="},      // ("doubleEqual", "==")
+                {TokenType::op_NotEqual,     "!="},      // ("notEqual", "!=")
+                {TokenType::op_Not,          "!"},       // ("not", "!")
+                {TokenType::op_GreaterEqual, ">="},      // ("greaterEq", ">=")
+                {TokenType::op_LessEqual,    "<="},      // ("lessEq", "<=")
+                {TokenType::op_Plus,         "+"},       // ("plus", "+")
+                {TokenType::op_Minus,        "-"},       // ("minus", "-")
+                {TokenType::op_Multiply,     "*"},       // ("star", "*")
+                {TokenType::op_Divide,       "/"},       // ("div", "/")
+                {TokenType::punc_Dot,          "."}        // ("dot", ".")
+            };
+
 
             this->tokens_regExp=tokens;
             std::vector<NFA> nfas={};
@@ -89,8 +143,7 @@ class Lexer
             DFA dfa= nfa.convertToDFA();
             finaldfa=dfa;
             
-
-
+            
 
             // if( existAutamata(Number) )
             // {
@@ -140,49 +193,13 @@ class Lexer
             // DFA dfa= nfa.convertToDFA();
             
             // automatas.push_back(dfa);
-            
+                        
         }
 
-        std::string getString(TokenType type) {
-            switch (type) {
-                case Number:       return "Number";
-                case Identifier:   return "Identifier";
-                case Plus:         return "Plus";
-                case Minus:        return "Minus";
-                case Multiply:     return "Multiply";
-                case Divide:       return "Divide";
-                case Modulo:       return "Modulo";
-                case LeftParen:    return "LeftParen";
-                case RightParen:   return "RightParen";
-                case LeftBrace:    return "LeftBrace";
-                case RightBrace:   return "RightBrace";
-                case Semicolon:    return "Semicolon";
-                case Comma:        return "Comma";
-                case Dot:          return "Dot";
-                case Assignment:   return "Assignment";
-                case Equal:        return "Equal";
-                case NotEqual:     return "NotEqual";
-                case Less:         return "Less";
-                case LessEqual:    return "LessEqual";
-                case Greater:      return "Greater";
-                case GreaterEqual: return "GreaterEqual";
-                case And:          return "And";
-                case Or:           return "Or";
-                case Not:          return "Not";
-                case If:           return "If";
-                case Else:         return "Else";
-                case For:          return "For";
-                case While:        return "While";
-                case Return:       return "Return";
-                case EOFs:          return "EOFs";
-                default:           return "Unknown";
-                }
-
-        }
         
         bool existAutamata(TokenType type)
         {
-            std::string namefile=getString(type);
+            std::string namefile=getStringOfToken(type);
 
              if (!std::filesystem::exists("automatas")) return false;
              if (!std::filesystem::exists("automatas/" + namefile ))  return false;
@@ -356,139 +373,16 @@ class Lexer
                  TokenType t=finaldfa.m_final_token_types[currentState];
                  return Token(inp.substr(cr,currentpos-cr),t,currentLine,currentCol);
             }
-            
-
-            
+         
             return Token("error",Error,this->currentLine,this->currentCol);
-            
-
-          
-
         }
-    
-   
+
     };
-
-
 
 // void testTokenize(Lexer lex,std::string type,std::string inp, bool expected)
 // {
 //     bool res=lex.is_valid_token(type,inp);
 //     std::cout<<"Input: "<<inp<<", res: "<<res<<", esperado: "<<expected <<std::endl;
 // }
-RE* unionOfSymbols(const std::string &symbols) 
-        {
-            if (symbols.empty())
-                return nullptr; 
-
-            RE* result = new SymbolRE(symbols[0]);
-            
-            // Para cada símbolo adicional, lo unimos al resultado actual.
-            for (size_t i = 1; i < symbols.size(); ++i) {
-                result = new UnionRE(result, new SymbolRE(symbols[i]));
-            }
-            return result;
-        }
 
 
-RE* digits_reguex()
-        {
-           // RE* digit = unionOfSymbols("0123456789");
-            RE* digit = unionOfSymbols("0123456789");
-           
-            RE* digits= new ConcatenationRE(digit,new ClousureRE(digit));
-            RE* opcfrac= new UnionRE(new ConcatenationRE(new SymbolRE('.'),digits),new EpsilonRE());
-            RE* number= new ConcatenationRE(digits,opcfrac);
-            return number;
-        }
-
-int main()
-{
-    std::vector<pair<std::string,std::string>>tokens_regExp;
-    std::vector<tuple<int,std::string,int>>t;
-
-    std::vector<pair<TokenType,std::string>> tokens={};
-
-
-    // Palabras reservadas (keywords) comunes
-    tokens.push_back({If, "if"});
-    tokens.push_back({Else, "else"});
-    tokens.push_back({While, "while"});
-    tokens.push_back({For, "for"});
-    tokens.push_back({Return, "return"});
-    tokens.push_back({Break, "break"});
-    tokens.push_back({Continue, "continue"});
-    tokens.push_back({Switch, "switch"});
-    tokens.push_back({Case, "case"});
-    tokens.push_back({Default, "default"});
-
-
-    // // Operadores aritméticos
-    tokens.push_back({Plus, "+"});
-    tokens.push_back({Minus, "-"});
-    tokens.push_back({Multiply, "*"});
-    tokens.push_back({Divide, "/"});
-    tokens.push_back({Modulo, "%"});
-    
-    // // Operadores de asignación y compuestos
-     tokens.push_back({Assignment, "="});
-
-    
-    // // Operadores relacionales
-    tokens.push_back({Equal, "=="});
-    tokens.push_back({NotEqual, "!="});
-    tokens.push_back({Less, "<"});
-    tokens.push_back({Greater, ">"});
-    tokens.push_back({LessEqual, "<="});
-    tokens.push_back({GreaterEqual, ">="});
-    
-    // // Operadores lógicos
-    tokens.push_back({LogicalAnd, "&&"});
-    tokens.push_back({LogicalOr, "||"});
-    tokens.push_back({LogicalNot, "!"});
-    
-    // // Operadores bit a bit (muy usados en ciertos lenguajes)
-    // tokens.push_back({"bitwise_and", "&"});
-    // tokens.push_back({"bitwise_or", "|"});
-    // tokens.push_back({"bitwise_xor", "^"});
-    // tokens.push_back({"bitwise_not", "~"});
-    // tokens.push_back({"shift_left", "<<"});
-    // tokens.push_back({"shift_right", ">>"});
-    
-    // // Delimitadores y signos de puntuación
-    tokens.push_back({LeftParen, "("});
-    tokens.push_back({RightParen, ")"});
-    tokens.push_back({OpenBracket, "["});
-    tokens.push_back({CloseBracket, "]"});
-    tokens.push_back({LeftBrace, "{"});
-    tokens.push_back({RightBrace, "}"});
-    tokens.push_back({Semicolon , ";"});
-    tokens.push_back({Comma, ","});
-    tokens.push_back({Dot, "."});
-    
-    // // Otros símbolos útiles
-    // tokens.push_back({"colon", ":"});
-
-
-   
-
-    Lexer lexer(tokens);
-
-     std::string inp=" 5 < 34 or 23.3 <= 4  ";
-    std::string inp2=R"(42;
-    print(42);
-    print((((1 + 2) ^ 3) * 4) / 5);
-    print("Hello World");
-    print("The message is \\"Hello World\\"");
-    print("The meaning of life is " @ 42);
-    print(sin(2 * PI) ^ 2 + cos(3 * PI / log(4, 64)));)";
-
-     auto toks=lexer.scanTokens(inp2);
-
-     for (auto tok: toks)
-     {
-        std::cout<<tok.to_string()<<std::endl;
-     }
- 
-}
-   

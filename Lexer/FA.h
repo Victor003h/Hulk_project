@@ -6,7 +6,7 @@
 #include <iostream>
 #include <fstream>
 #include <filesystem>
-#include "Token.cpp"
+#include "Token.h"
 
 using namespace std;
 
@@ -281,6 +281,8 @@ class NFA{
             return false;
          }
 
+        
+
         DFA convertToDFA()
         {
             std::map<std::set<int>,int> dfn_states={};
@@ -323,13 +325,18 @@ class NFA{
             {
                 int dfa_state_id = pair.second;
                 bool isAccept = false;
-                TokenType token = UNKNOWN;  
+                TokenType token = UNKNOWN; 
                 for (int state_nfa: pair.first)
                 {
-
+                    
                     if (is_final_state(state_nfa))
                     {
-                        token=m_final_token_types[state_nfa];
+                        auto t=m_final_token_types[state_nfa];
+                        if(morePriority(t,token))    
+                        {
+                            token=t;
+                        }
+
                         isAccept=true;
 
                         finalStates.push_back(pair.second);
