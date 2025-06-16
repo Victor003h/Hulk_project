@@ -1,6 +1,6 @@
 #include<vector>
 #include<iostream>
-#include "AstNodes.cpp"
+#include "AstNodes.h"
 #include "grammarItems.h"
 
 
@@ -164,6 +164,38 @@ class AstBuilderVisitor: public ParseTreeVisitor
                 
             }
 
+            if (node->m_value->value == "RelationalExpression")
+            {
+                AstNode* left = node->m_children[1]->accept(*this);
+                return RelationalExpressionPrime(left, node->m_children[0]);
+            }
+
+            if (node->m_value->value == "BooleanExpression")
+            {
+                AstNode* left = node->m_children[1]->accept(*this);
+                return BooleanExpressionPrime(left, node->m_children[0]);
+            }
+
+            if (node->m_value->value == "BooleanTerm")
+            {
+                AstNode* left = node->m_children[1]->accept(*this);
+                return BooleanTermPrime(left, node->m_children[0]);
+            }
+
+            if (node->m_value->value == "BooleanFactor")
+            {
+                if(node->m_children.size()==2)
+                {
+                     return new UnaryExpression(node->m_children[1]->m_token, node->m_children[0]->accept(*this));
+                }
+                
+                else
+                {
+                    return node->m_children[0]->accept(*this);
+                }
+            }
+
+
 
             if(node->m_value->value=="ExpAditiva")
             {
@@ -185,20 +217,46 @@ class AstBuilderVisitor: public ParseTreeVisitor
             
             if(node->m_value->value=="Primary")
             {
-                if(node->m_children.size()==3)
+                if(node->m_children.size()==3 && node->m_children[2]->m_value->value=="punc_LeftParen")
                 {
                     return node->m_children[1]->accept(*this);
                 }
-                if(node->m_children[0]->m_value->value=="Number")
+                if(node->m_children.size()==3)
                 {
-                    
-                    return new LiteralNode(node->m_children[0]->m_token);
-                }
-                if(node->m_children[0]->m_value->value=="Identifier")
-                {
-                    return new IdentifierNode(node->m_children[0]->m_token);
+                    ParseNode* identifierNode = node->m_children[2]; // "Identifier"
+                    ParseNode* funCallPrime = node->m_children[1];   // "FunCallPrime"
+                    ParseNode* memberAccessPrime = node->m_children[0]; // "MemberAccessPrime"
+
+                    // 1. Creamos el nodo base: puede ser identifier o llamada a función
+                    AstNode* base;
+                    if (!funCallPrime->m_children.empty() &&
+                        funCallPrime->m_children[2]->m_value->value == "punc_LeftParen") {
+                        // Es una llamada a función: x(...)
+                        std::vector<AstNode*> args = ArgList(funCallPrime->m_children[1]);
+                        base = new FunCallNode(identifierNode->m_token, args);
+                    } else {
+                        // Solo es un identificador
+                        base = new IdentifierNode(identifierNode->m_token);
+                    }
+
+                    // 2. Ahora procesamos encadenamiento de miembros: .x.y().z
+                    return parseMemberAccessChain(base, memberAccessPrime);
+
                 }
                 
+
+                if(node->m_children[0]->m_value->value=="Number")
+                {
+                   auto l= new LiteralNode(node->m_children[0]->m_token);
+                   l->type="Number";
+                    return l;
+                }
+                if(node->m_children[0]->m_value->value=="kw_false_" ||node->m_children[0]->m_value->value=="kw_true_")
+                {
+                   auto l= new LiteralNode(node->m_children[0]->m_token);
+                   l->type="Boolean";
+                    return l;
+                }
             }
 
             std::cout<<"Unknow node "<<node->m_value->value<<std::endl;            
@@ -245,8 +303,11 @@ class AstBuilderVisitor: public ParseTreeVisitor
 
        std::pair<std::vector<AstNode*> ,AstNode*> MethodSignaturePrime(ParseNode* node)
        {
+            AstNode* body=nullptr;
             std::vector<AstNode*> params= ParamList(node->m_children[2]);
-            AstNode* body= node->m_children[0]->m_children[0]->accept(*this);
+            if(!(node->m_children[0]->m_children.empty()))
+                body= node->m_children[0]->m_children[0]->accept(*this);
+            
             return {params,body};
 
        }
@@ -291,6 +352,7 @@ class AstBuilderVisitor: public ParseTreeVisitor
             }
             return list;
         }
+
 
        std::vector<AstNode*> ExpList(ParseNode* node)
        {
@@ -392,7 +454,93 @@ class AstBuilderVisitor: public ParseTreeVisitor
             return ExpExponPrime(temp,node->m_children[0]);
         }
 
+        // Procesa la extensión de una RelationalExpression.
+        AstNode* RelationalExpressionPrime(AstNode* left, ParseNode* node) {
+           if(node->m_children.empty())    return left;
+
+            AstNode* right=node->m_children[1]->accept(*this);
+            Token op=node->m_children[2]->m_token;
+            AstNode* temp = new BinaryExpression(left,op,right);
+            return RelationalExpressionPrime(temp,node->m_children[0]);
+        }
+
+        // Para las producciones de BooleanExpression (para el operador 'or'):
+        AstNode* BooleanExpressionPrime(AstNode* inherited, ParseNode* node) {
+            if(node->m_children.empty())    return inherited;
+
+            AstNode* right=node->m_children[1]->accept(*this);
+            Token op=node->m_children[2]->m_token;
+            AstNode* temp = new BinaryExpression(inherited,op,right);
+            return BooleanExpressionPrime(temp,node->m_children[0]);
+        }
+
+        // Para las producciones de BooleanTerm (para el operador 'and'):
+        AstNode* BooleanTermPrime(AstNode* left, ParseNode* node) {
+            if(node->m_children.empty())    return left;
+
+            AstNode* right=node->m_children[1]->accept(*this);
+            Token op=node->m_children[2]->m_token;
+            AstNode* temp = new BinaryExpression(left,op,right);
+            return BooleanTermPrime(temp,node->m_children[0]);
+        }
         
+
+        std::vector<AstNode*> ArgList(ParseNode* node)
+       {
+            std::vector<AstNode*> list;
+            if(node->m_children.empty())    return list;
+            auto arg=node->m_children[1]->accept(*this);
+            list.push_back(arg);
+
+            auto parmlist2=ArgListTail(node->m_children[0]);
+             for(auto child:parmlist2)
+            {
+                list.push_back(child);
+            }
+            return list;
+
+       }
+
+        std::vector<AstNode*> ArgListTail(ParseNode* node)
+        {
+            std::vector<AstNode*> list;
+            if(node->m_children.empty())    return list;
+            auto arg=node->m_children[1]->accept(*this);
+            list.push_back(arg);
+
+            auto asglist= ArgListTail(node->m_children[0]);
+            for(auto child:asglist)
+            {
+                list.push_back(child);
+            }
+            return list;
+        }
+
+        AstNode* parseMemberAccessChain(AstNode* base, ParseNode* memberAccessPrime) 
+        {
+            if (memberAccessPrime->m_children.empty()) return base;
+
+            // Esperado: MemberAccessPrime -> dot Identifier FunCallPrime MemberAccessPrime
+            ParseNode* dotNode = memberAccessPrime->m_children[3]; // "."
+            ParseNode* memberId = memberAccessPrime->m_children[2]; // Identifier
+            ParseNode* funCallPrime = memberAccessPrime->m_children[1]; // FunCallPrime
+            ParseNode* nextMemberAccess = memberAccessPrime->m_children[0]; // MemberAccessPrime
+
+            AstNode* member;
+            if (!funCallPrime->m_children.empty() &&
+                funCallPrime->m_children[2]->m_value->value == "punc_LeftParen") {
+                // Es una función miembro: .x()
+                std::vector<AstNode*> args = ArgList(funCallPrime->m_children[1]);
+                member = new FunCallNode(memberId->m_token, args);
+            } else {
+                // Es una propiedad: .x
+                member = new IdentifierNode(memberId->m_token);
+            }
+
+            AstNode* access = new MemberCall(base, member);
+            return parseMemberAccessChain(access, nextMemberAccess); // recursión
+}
+
     };
 
 AstNode*  ParseNode::accept(ParseTreeVisitor &visitor)

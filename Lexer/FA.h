@@ -271,7 +271,7 @@ class NFA{
 
 
 
-           for (int i=0;i<cs.size();i++)
+           for (size_t i=0;i<cs.size();i++)
             {
                 auto eps=eClousure(cs[i],false);
                 for(int i:eps) cs.push_back(i);
@@ -324,7 +324,6 @@ class NFA{
             for (auto pair : dfn_states)
             {
                 int dfa_state_id = pair.second;
-                bool isAccept = false;
                 TokenType token = UNKNOWN; 
                 for (int state_nfa: pair.first)
                 {
@@ -336,8 +335,6 @@ class NFA{
                         {
                             token=t;
                         }
-
-                        isAccept=true;
 
                         finalStates.push_back(pair.second);
                     }
@@ -437,7 +434,6 @@ class NFA{
         static  NFA UnionRE(NFA a1,NFA a2)
         {
             int startstate= a1.total_states+a2.total_states;
-            int final_s=a1.total_states+a2.total_states+1;
             std::vector<int> finals=a1.final_states;
             int totalstates=a1.total_states+a2.total_states+2;
 
@@ -452,7 +448,7 @@ class NFA{
                for (auto value2: value.second)
                {
                     std::vector<int> new_states=value2.second;
-                    for(int i=0 ;i<new_states.size();i++)
+                    for(size_t i=0 ;i<new_states.size();i++)
                     {
                         new_states[i]+=a1.total_states;
                     }
@@ -516,7 +512,7 @@ class NFA{
                for (auto value2: value.second)
                {
                     std::vector<int> new_states=value2.second;
-                    for(int i=0 ;i<new_states.size();i++)
+                    for(size_t i=0 ;i<new_states.size();i++)
                     {
                         new_states[i]+=a1.total_states;
                     }

@@ -2,13 +2,11 @@
 #include <string>
 #include <filesystem>
 
-
 enum TokenType {
     Number,
     EOFs,
     Identifier,
     String,
-
 
     // Operators 
     op_Plus,           // +
@@ -87,8 +85,6 @@ enum TokenType {
     Error,
     UNKNOWN,
 
-
- 
 };
 
 std::string getStringOfToken(TokenType type) {
@@ -206,8 +202,6 @@ bool morePriority(TokenType token1, TokenType token2) {
 
 
 
-
-
 struct Token{
     
     std::string lexeme;
@@ -234,4 +228,3 @@ struct Token{
         return ss.str();
     }
 };
-

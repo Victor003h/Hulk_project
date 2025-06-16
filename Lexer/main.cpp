@@ -58,8 +58,9 @@ int main()
     };
 
 
+    ErrorHandler error;
 
-    Lexer lexer;
+    Lexer lexer(error);
 
     std::string inp=" 5 < 34 or 23.3 <= 4  ";
     std::string inp2=R"(42;

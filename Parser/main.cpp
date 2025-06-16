@@ -27,9 +27,11 @@ void printProductions(const std::vector<Production>& productions) {
 
 
 int main() {
-        
-        Lexer lexer;
 
+         ErrorHandler error;
+
+        Lexer lexer(error);
+    
         std::string inp=R"(type Point {
             x = 0;
             y = 0;
@@ -42,6 +44,10 @@ int main() {
 
     
         auto tokens=lexer.scanTokens(inp);
+        if(lexer.errorHandler.hasErrors())
+        {
+            return 0;
+        }
         // std::vector<Token>tokens={
 
         //     Token("",TokenType::Identifier,1,1),
@@ -59,17 +65,24 @@ int main() {
 
     
    // Grammar grammar(Program, terminals, nonTerminals, productions);
-    Grammar grammar =Grammar::loadGrammar("grammar.txt");
+   // Grammar grammar =Grammar::loadGrammar("grammar.txt");
 
 
     //grammar.printParsingTable();
 
-    Parser* parser=new Parser(grammar);
+    Parser* parser=new Parser(lexer.errorHandler);
+    
     //printProductions(parser->m_grammar.m_productions);
   //  parser->m_grammar.printParsingTable();
     auto tree= parser->parse(tokens);
+    if(tree==nullptr || parser->errorHandler.hasErrors())
+    {
+        parser->errorHandler.printErrors();
+        return 0;
+
+    }
     AstBuilderVisitor visitor;
-    AstNode* ast=tree.accept(visitor);
+    AstNode* ast=tree->accept(visitor);
     ast->print();
     std::cout<<"\n";
 

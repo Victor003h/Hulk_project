@@ -12,7 +12,7 @@
 
 #include "grammarItems.h"
 #include "parseTree.cpp"
-#include "../common/Error.cpp"
+#include "../common/Error.hpp"
 
 
 
@@ -27,6 +27,8 @@ class Grammar
         std::map<Symbol,std::set<Symbol>> first;
         std::map<Symbol,std::set<Symbol>> follow;
         std::map<Symbol,std::map<Symbol,int>> m_parsing_table;
+        ErrorHandler errorHandler;
+    
         
         Grammar(Symbol startSymbol,std::set<Symbol> terminals,std::set<Symbol> non_terminals,std::vector<Production> productions)
         {
@@ -140,7 +142,7 @@ class Grammar
         {
             std::set<Symbol> result;
             bool eps=true;
-            for (int i=0; i<list.size();i++)
+            for (size_t i=0; i<list.size();i++)
             {
                 if(eps)
                 {
@@ -255,7 +257,7 @@ class Grammar
 
                 for(auto [A,alpha]:m_productions)
                 {
-                    for (int i=0;i<alpha.size();i++)
+                    for (size_t i=0;i<alpha.size();i++)
                     {
                         if(alpha[i].type!=SymbolType::NonTerminal) continue;
 
@@ -293,7 +295,7 @@ class Grammar
     
         void BuildTable()
         {
-            for (int i = 0; i < m_productions.size(); i++) // for each A -> a
+            for (size_t i = 0; i < m_productions.size(); i++) // for each A -> a
             {
                  auto [left,right]= m_productions[i];
                 // if(right[0].type==SymbolType::Epsilon)
@@ -319,7 +321,9 @@ class Grammar
                     if(terminal.type==SymbolType::Epsilon) continue; ;
                     if( m_parsing_table[left][terminal])
                     {
-                        throw  ("eerror en la tabla de parser");
+                        
+                        errorHandler.reportError(Token(),"Grammar must be ll1");
+                        return;
                     }
                     m_parsing_table[left][terminal]=i;
                 }
@@ -331,7 +335,8 @@ class Grammar
                         if(terminal.type==SymbolType::Epsilon)  continue;  ;
                         if( m_parsing_table[left][terminal])
                         {
-                            throw  ("eerror en la tabla de parser");
+                            errorHandler.reportError(Token(),"Grammar must be ll1");
+                            return;
                         }
                         m_parsing_table[left][terminal]=i;
                     }
@@ -367,7 +372,7 @@ class Grammar
 }
 
 
-        ParseTree parse(std::vector<Token> inpTokens,ErrorHandler& errorHandler)
+        ParseTree parse(std::vector<Token> inpTokens)
         {
             ParseNode* root= new ParseNode(&m_startSymbol);
             ParseNode* endf= new ParseNode (new Symbol("EOFs",SymbolType::Terminal));
@@ -390,8 +395,9 @@ class Grammar
                         auto expected=first[*(X->m_value)];
                         std::string msg="Unexpected token '"+ inpTokens[index].lexeme+"' expected "+ (*expected.begin()).value;
                         errorHandler.reportError(inpTokens[index],msg);
+                        return tree;
 
-                        throw std::runtime_error(msg);
+                       // throw std::runtime_error(msg);
                     }
 
                     int in=m_parsing_table[*X->m_value][lookahead];
@@ -407,6 +413,13 @@ class Grammar
                         stack.push(childNode);
 
                     } 
+                    // if(p.right.size()==0)
+                    // {
+                    //     auto parent=X->m_parent;
+                    //     X->m_parent=nullptr;
+                    //     parent->m_children.erase(parent->m_children.begin());
+
+                    // }
                 }
                 else if(X->m_value->type==SymbolType::Terminal)
                 {
@@ -422,8 +435,9 @@ class Grammar
                        
                         std::string msg="Unexpected token '"+ inpTokens[index].lexeme+"' expected "+ X->m_value->value;
                         errorHandler.reportError(inpTokens[index],msg);
+                        return tree;
 
-                        throw std::runtime_error("Parser error , no matched ");
+                        //throw std::runtime_error("Parser error , no matched ");
                     }
                 }
 

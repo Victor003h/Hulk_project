@@ -3,6 +3,7 @@
 #include <iostream>
 #include "regular_expressions.h"
 #include <map>
+#include "../common/Error.hpp"
 
 class Lexer
 {
@@ -15,8 +16,11 @@ class Lexer
         
 
     public:
-        Lexer( )
+        ErrorHandler errorHandler;
+
+        Lexer( ErrorHandler& errorHandler):errorHandler(errorHandler)
         {
+            
 
             std::vector<std::pair<TokenType, std::string>> tokens = {
                 {TokenType::op_Modulo,       "%"},   // ("modOp", "%")
@@ -59,6 +63,7 @@ class Lexer
                 {TokenType::op_LogicalOr,    "||"},      // ("doubleOr", "||")
                 {TokenType::op_Or,           "|"},       // ("or", "|")
                 {TokenType::op_And,          "&"},       // ("and", "&")
+                {TokenType::op_LogicalAnd,    "&&"},      // ("doubleOr", "||")
                 {TokenType::op_Equal,        "=="},      // ("doubleEqual", "==")
                 {TokenType::op_NotEqual,     "!="},      // ("notEqual", "!=")
                 {TokenType::op_Not,          "!"},       // ("not", "!")
@@ -68,6 +73,7 @@ class Lexer
                 {TokenType::op_Minus,        "-"},       // ("minus", "-")
                 {TokenType::op_Multiply,     "*"},       // ("star", "*")
                 {TokenType::op_Divide,       "/"},       // ("div", "/")
+                {TokenType::op_Exp,         "^"},         
                 {TokenType::punc_Dot,          "."}        // ("dot", ".")
             };
 
@@ -132,7 +138,7 @@ class Lexer
 
             NFA nfa=nfas[0];
 
-            for (int i=1; i<nfas.size();i++)
+            for (size_t i=1; i<nfas.size();i++)
             {
                 nfa= NFA::UnionRE(nfa,nfas[i]);
             }
@@ -279,7 +285,7 @@ class Lexer
             std::vector<Token> tokens={};
             int cr=0;
 
-            while(cr<inp.length())
+            while(cr<inp.size())
             {
                 if(inp[cr]==' ')
                 {
@@ -307,8 +313,13 @@ class Lexer
                     continue;
                 }
                 
+
                // Token token= scanToken(inp,cr);
                 Token token= scanToken2(inp,cr);
+                if(token.type==TokenType::Error)
+                {
+                    errorHandler.reportError(token,"Lexical error: unrecognized token ");
+                }
                 cr+=token.lexeme.length();
                 currentCol+=token.lexeme.length();
                 tokens.push_back(token);
@@ -318,48 +329,48 @@ class Lexer
             return tokens;
         }
 
-        Token scanToken(std::string inp,int cr)
-        {
-            std::pair<TokenType,int> matched={Error,-1};
+        // Token scanToken(std::string inp,int cr)
+        // {
+        //     std::pair<TokenType,int> matched={Error,-1};
 
-            for (auto pair :automatas)
-            {
-                int currentpos= cr;
-                int currentState=pair.second.getStartState();
+        //     for (auto pair :automatas)
+        //     {
+        //         int currentpos= cr;
+        //         int currentState=pair.second.getStartState();
                 
-                while(cr<inp.length())
-                {
-                    char n=inp[currentpos];
-                    int nextstate=pair.second.nextState(n,currentState);
-                    if (nextstate==-1)  break;
-                    currentState=nextstate;
-                    currentpos++;
+        //         while(cr<inp.length())
+        //         {
+        //             char n=inp[currentpos];
+        //             int nextstate=pair.second.nextState(n,currentState);
+        //             if (nextstate==-1)  break;
+        //             currentState=nextstate;
+        //             currentpos++;
             
-                }
-                if (pair.second.is_final_state(currentState) &&matched.second< currentpos-cr)
-                {
-                    matched={pair.first,currentpos-cr};
-                }
-            }
+        //         }
+        //         if (pair.second.is_final_state(currentState) &&matched.second< currentpos-cr)
+        //         {
+        //             matched={pair.first,currentpos-cr};
+        //         }
+        //     }
 
-            if (matched.second==-1)
-            {
-                return Token("error",Error,this->currentLine,this->currentCol);
-            }
+        //     if (matched.second==-1)
+        //     {
+        //         return Token("error",Error,this->currentLine,this->currentCol);
+        //     }
 
-            return Token(inp.substr(cr,matched.second),matched.first,currentLine,currentCol);
+        //     return Token(inp.substr(cr,matched.second),matched.first,currentLine,currentCol);
 
-        }
+        // }
     
         Token scanToken2(std::string inp,int cr)
         {
-            std::pair<TokenType,int> matched={Error,-1};
+           // std::pair<TokenType,int> matched={Error,-1};
 
             int currentpos=cr;
             int currentState=finaldfa.start_state;
 
 
-            while(cr <inp.length())
+            while(cr <inp.size())
             {
                 char n=inp[currentpos];
                 int nextstate=finaldfa.nextState(n,currentState);

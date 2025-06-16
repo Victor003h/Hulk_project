@@ -1,0 +1,92 @@
+# === VARIABLES GLOBALES ===
+
+# Herramientas y flags
+CXX         := g++
+CXXFLAGS    := -std=c++17 -Wall -Wextra -g
+
+# Directorios
+ROOT_DIR    := .
+BUILD_DIR   := $(ROOT_DIR)/.build
+
+LEXER_DIR   := $(ROOT_DIR)/Lexer
+PARSER_DIR  := $(ROOT_DIR)/Parser
+SEMANTIC_DIR:= $(ROOT_DIR)/Semantic
+CODEGEN_DIR := $(ROOT_DIR)/Codegen
+
+# Fuentes en cada fase
+LEXER_SRCS    := $(wildcard $(LEXER_DIR)/*.cpp)
+PARSER_SRCS   := $(wildcard $(PARSER_DIR)/*.cpp)
+SEMANTIC_SRCS := $(wildcard $(SEMANTIC_DIR)/*.cpp)
+CODEGEN_SRCS  := $(wildcard $(CODEGEN_DIR)/*.cpp)
+
+# Para el ejecutable final se usan los archivos fuente *excepto* el main de cada carpeta
+LEXER_SRCS_FULL    := $(filter-out $(LEXER_DIR)/main.cpp, $(LEXER_SRCS))
+PARSER_SRCS_FULL   := $(filter-out $(PARSER_DIR)/main.cpp, $(PARSER_SRCS))
+SEMANTIC_SRCS_FULL := $(filter-out $(SEMANTIC_DIR)/main.cpp, $(SEMANTIC_SRCS))
+CODEGEN_SRCS_FULL  := $(filter-out $(CODEGEN_DIR)/main.cpp, $(CODEGEN_SRCS))
+
+# Fuente principal en la raíz (para ejecutar el programa completo)
+TOP_SRC    := $(ROOT_DIR)/main.cpp
+
+# Nombres de ejecutables
+LEXER_EXE      := $(BUILD_DIR)/lexer.exe
+PARSER_EXE     := $(BUILD_DIR)/parser.exe
+SEMANTIC_EXE   := $(BUILD_DIR)/semantic.exe
+CODEGEN_EXE    := $(BUILD_DIR)/codegen.exe
+FULL_EXE       := $(BUILD_DIR)/esi.exe
+
+# === TARGETS ===
+
+all: 	build
+	@echo " Build completo."
+
+build:	$(FULL_EXE) 	$(LEXER_EXE) 	$(PARSER_EXE)	$(SEMANTIC_EXE)	$(CODEGEN_EXE)
+	@echo " Todo compilado. Ejecutables en $(BUILD_DIR)"
+
+# --- Objetivos para probar cada fase ---
+
+$(LEXER_EXE):	$(LEXER_SRCS)
+	@mkdir -p	$(BUILD_DIR)
+	$(CXX)	$(CXXFLAGS) $^ -o $@
+	@echo " Ejecutable de Lexer generado: $(LEXER_EXE)"
+
+$(PARSER_EXE):	$(PARSER_SRCS)
+	@mkdir -p	$(BUILD_DIR)
+	$(CXX)	$(CXXFLAGS)	$^	-o	$@
+	@echo "🔨 Ejecutable de Parser generado: $(PARSER_EXE)"
+
+$(SEMANTIC_EXE):	$(SEMANTIC_SRCS)
+	@mkdir -p	$(BUILD_DIR)
+	$(CXX)	$(CXXFLAGS)	$^	-o	$@
+	@echo "🔨 Ejecutable de Semantic generado: $(SEMANTIC_EXE)"
+
+$(CODEGEN_EXE):	$(CODEGEN_SRCS)
+	@mkdir -p	$(BUILD_DIR)
+	$(CXX)	$(CXXFLAGS)	$^	-o	$@
+	@echo "🔨 Ejecutable de Codegen generado: $(CODEGEN_EXE)"
+
+# --- Objetivo final: Programa completo (ESI) ---
+# Se compilan el main de la raíz más los archivos fuente de cada fase (excluyendo sus propios main.cpp)
+$(FULL_EXE):	$(TOP_SRC)	$(LEXER_SRCS_FULL)	$(PARSER_SRCS_FULL)	$(SEMANTIC_SRCS_FULL)	$(CODEGEN_SRCS_FULL)
+	@mkdir -p	$(BUILD_DIR)
+	$(CXX)	$(CXXFLAGS)	$^	-o	$@
+	@echo "🚀 Ejecutable completo generado: $(FULL_EXE)"
+
+
+semantic_run:	$(SEMANTIC_EXE)
+	@echo "🚀 Ejecutando solo Semantic..."
+	@$(SEMANTIC_EXE)
+
+
+# === Otros targets ===
+
+run: all
+	@echo "🚀 Ejecutando programa ESI ..."
+	@$(FULL_EXE)
+
+clean:
+	@echo "🧹 Limpiando proyecto..."
+	rm	-rf	$(BUILD_DIR)
+	@echo "🧹 Proyecto limpio."
+
+.PHONY: all build run clean

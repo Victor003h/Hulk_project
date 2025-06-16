@@ -9,15 +9,24 @@ class Parser
         
 
     public:
-        Parser(Grammar grammar)
+        Parser( ErrorHandler& errorHandler):errorHandler(errorHandler)
         {
-            m_grammar=grammar;
-        
+            m_grammar= Grammar::loadGrammar("grammar.txt");;
+            errorHandler=m_grammar.errorHandler;
+
+    
         }
 
-        ParseTree parse(std::vector<Token> tokens)
+        ParseTree* parse(std::vector<Token> tokens)
         {
-            return m_grammar.parse(tokens,errorHandler);
+            if(m_grammar.errorHandler.hasErrors())
+            {
+                return nullptr;
+            }
+            auto temp= m_grammar.parse(tokens);
+            ParseTree* tree= new ParseTree(temp);
+            errorHandler=m_grammar.errorHandler;
+            return tree;
         }
 
         // ASTNode* convertToAst(ParseTree tree)
