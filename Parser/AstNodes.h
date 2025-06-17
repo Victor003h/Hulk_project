@@ -21,6 +21,7 @@ class LetExpression;
 class UnaryExpression;
 class FunCallNode;
 class MemberCall;
+class DestructiveAssignNode ;
 
 class Visitor {
 public:
@@ -41,7 +42,7 @@ public:
     virtual void visit(UnaryExpression* node)         = 0;
     virtual void visit(FunCallNode* node)        = 0;
     virtual void visit(MemberCall* node)        = 0;
-
+     virtual void visit(DestructiveAssignNode* node)        = 0;
 };
 
 class AstNode {
@@ -165,16 +166,21 @@ public:
     Token name;
     std::vector<AstNode*> atributes;
     std::vector<AstNode*> methods;
+    std::vector<AstNode*> args;
 
 
-    TypeNode(Token name, std::vector<AstNode*> atributes, std::vector<AstNode*> methods)
-        : name(name), atributes(atributes), methods(methods) {
+    TypeNode(Token name, std::vector<AstNode*> atributes, std::vector<AstNode*> methods,std::vector<AstNode*> args)
+        : name(name), atributes(atributes), methods(methods),args(args) {
         
     }
 
     void print(int indent = 0) const override {
         std::string spacing(indent, ' ');
         std::cout << spacing << "Type Expression: " << name.lexeme << std::endl;
+        std::cout << spacing << "Arguments: " << std::endl;
+        for (const auto& arg : args) {
+            arg->print(indent + 4);
+        }
         std::cout << spacing << "  Atributes:" << std::endl;
         for (const auto& atrib : atributes) {
             atrib->print(indent + 4);
@@ -461,3 +467,31 @@ class MemberCall:public AstNode
 };
 
 
+class DestructiveAssignNode : public AstNode {
+public:
+    AstNode* lhs;  // Lo que está a la izquierda de :=
+    Token op_des;
+    AstNode* rhs;  // Lo que está a la derecha de :=
+
+    std::string type = "Object";
+
+    DestructiveAssignNode(AstNode* lhs,Token op, AstNode* rhs)
+        : lhs(lhs),op_des(op), rhs(rhs) {}
+
+    void print(int indent = 0) const override {
+        std::string spacing(indent, ' ');
+        std::cout << spacing << "DestructiveAssignNode :=" << std::endl;
+        std::cout << spacing << "  LHS:" << std::endl;
+        lhs->print(indent + 4);
+        std::cout << spacing << "  RHS:" << std::endl;
+        rhs->print(indent + 4);
+    }
+
+    std::string getType() override { return type; }
+
+    void setType(std::string t) { type = t; }
+
+    void accept(Visitor& visitor) override {
+        visitor.visit(this);
+    }
+};

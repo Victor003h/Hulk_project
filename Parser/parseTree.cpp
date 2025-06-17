@@ -109,6 +109,7 @@ class AstBuilderVisitor: public ParseTreeVisitor
                 AstNode* body=node->m_children[0]->accept(*this);
                 return new WhileExpression(condition,body);
             }
+           
             if(node->m_value->value=="For_loop")
             {
 
@@ -140,27 +141,52 @@ class AstBuilderVisitor: public ParseTreeVisitor
             if(node->m_value->value=="AssignmentDecl")
             {
                 auto body=node->m_children[0]->accept(*this);
-                return  new AtributeNode(node->m_children[2]->m_token,body);
+                auto atrib=new AtributeNode(node->m_children[3]->m_token,body);
+                if(!(node->m_children[2]->m_children.empty()))
+                {
+                    atrib->setType(node->m_children[2]->m_children[0]->m_token.lexeme);
+                }
+                return   atrib;
 
             }
 
             if(node->m_value->value=="Expression")
             {
-                return node->m_children[0]->accept(*this);
+                if(node->m_children.size()==1)
+                    return node->m_children[0]->accept(*this);
+
+                auto left=node->m_children[1]->accept(*this);
+                if(node->m_children[0]->m_children.empty()) return left;
+
+                Token op= node->m_children[0]->m_children[1]->m_token;
+                auto rhl=node->m_children[0]->m_children[0]->accept(*this);
+                return new DestructiveAssignNode(left,op,rhl );
             }
+
 
             if(node->m_value->value=="FuncDef")
             {
                 Token id= node->m_children[1]->m_token;
                 auto [params,body]=MethodSignaturePrime(node->m_children[0]);
-                return new MethodNode(id,params,body);
+                auto meth= new MethodNode(id,params,body);
+                if(!(node->m_children[0]->m_children[1]->m_children.empty()))
+                {
+                    meth->setType(node->m_children[0]->m_children[1]->m_children[0]->m_token.lexeme);
+                }
+                return meth;
             
             }
+            
             if(node->m_value->value=="TypeDef")
             {
                 Token name= node->m_children[3]->m_token;
+                std::vector<AstNode*> args={};
+                if(!(node->m_children[3]->m_children.empty()))
+                {
+                    args=ParamList(node->m_children[3]->m_children[1]);
+                }
                 auto [atr,meth]= GetMemberList(node->m_children[1]);
-                return new TypeNode(name,atr,meth);
+                return new TypeNode(name,atr,meth,args);
                 
             }
 
@@ -288,12 +314,16 @@ class AstBuilderVisitor: public ParseTreeVisitor
 
        std::pair<bool,AstNode*> GetMember(ParseNode* node)
        {
-            Token id=node->m_children[2]->m_token;
+            Token id=node->m_children[3]->m_token;
             if(node->m_children[1]->m_children.size()==2)
             {
                 AstNode* exp=node->m_children[1]->m_children[0]->accept(*this);
-
-                return {true,new AtributeNode(id,exp)};   
+                auto atr=new AtributeNode(id,exp);
+                if(!(node->m_children[2]->m_children.empty()))
+                {
+                    atr->setType(node->m_children[2]->m_children[0]->m_token.lexeme);
+                }
+                return {true,atr};   
             }
 
             auto [params,body]=MethodSignaturePrime(node->m_children[1]->m_children[0]);
@@ -304,7 +334,7 @@ class AstBuilderVisitor: public ParseTreeVisitor
        std::pair<std::vector<AstNode*> ,AstNode*> MethodSignaturePrime(ParseNode* node)
        {
             AstNode* body=nullptr;
-            std::vector<AstNode*> params= ParamList(node->m_children[2]);
+            std::vector<AstNode*> params= ParamList(node->m_children[3]);
             if(!(node->m_children[0]->m_children.empty()))
                 body= node->m_children[0]->m_children[0]->accept(*this);
             
@@ -330,7 +360,12 @@ class AstBuilderVisitor: public ParseTreeVisitor
        {
             std::vector<AstNode*> list;
             if(node->m_children.empty())    return list;
-            list.push_back(new IdentifierNode(node->m_children[1]->m_token));
+            auto id =new IdentifierNode(node->m_children[2]->m_token);
+            if(!(node->m_children[1]->m_children.empty()))
+            {
+                id->setType(node->m_children[1]->m_children[0]->m_token.lexeme);
+            }
+            list.push_back(id);
             auto parmlist2=ParamListTail(node->m_children[0]);
              for(auto child:parmlist2)
             {
@@ -344,7 +379,12 @@ class AstBuilderVisitor: public ParseTreeVisitor
         {
             std::vector<AstNode*> list;
             if(node->m_children.empty())    return list;
-             list.push_back(new IdentifierNode(node->m_children[1]->m_token));
+            auto id =new IdentifierNode(node->m_children[2]->m_token);
+            if(!(node->m_children[1]->m_children.empty()))
+            {
+                id->setType(node->m_children[1]->m_children[0]->m_token.lexeme);
+            }
+            list.push_back(id);
             auto asglist= ParamListTail(node->m_children[0]);
             for(auto child:asglist)
             {
@@ -353,11 +393,10 @@ class AstBuilderVisitor: public ParseTreeVisitor
             return list;
         }
 
-
        std::vector<AstNode*> ExpList(ParseNode* node)
        {
             std::vector<AstNode*> list;
-            list.push_back(node->m_children[1]->accept(*this));
+            list.push_back(node->m_children[2]->accept(*this));
             auto asglist2=ExpListTail(node->m_children[0]);
              for(auto child:asglist2)
             {
@@ -453,7 +492,17 @@ class AstBuilderVisitor: public ParseTreeVisitor
             AstNode* temp = new BinaryExpression(inherited,op,right);
             return ExpExponPrime(temp,node->m_children[0]);
         }
+        // (exp) := (exp)
+        AstNode* DestructExpPrime(AstNode* inherited,ParseNode* node)
+        {
+             if(node->m_children.empty())    return inherited;
 
+            AstNode* right=node->m_children[0]->accept(*this);
+            Token op=node->m_children[1]->m_token;
+            AstNode* temp = new BinaryExpression(inherited,op,right);
+            return ExpExponPrime(temp,node->m_children[0]);
+
+        }
         // Procesa la extensión de una RelationalExpression.
         AstNode* RelationalExpressionPrime(AstNode* left, ParseNode* node) {
            if(node->m_children.empty())    return left;

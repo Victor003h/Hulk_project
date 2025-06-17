@@ -1,7 +1,7 @@
-Terminals:punc_Dot,kw_true_,kw_false_ ,op_LogicalOr, op_LogicalAnd, op_Not, op_Equal, op_NotEqual, op_Less, op_LessEqual, op_Greater,op_GreaterEqual, kw_type,kw_while,kw_for ,kw_if, kw_elif, kw_else, punc_Semicolon, punc_LeftParen, punc_RightParen, op_Plus, op_Minus, op_Multiply, op_Divide, op_Modulo, op_Exp, Identifier, Number, kw_let, kw_in, punc_Comma, punc_LeftBrace, punc_RightBrace, Assignment, arrow, kw_function
+Terminals: op_destruc, punc_Colon,punc_Dot,kw_true_,kw_false_ ,op_LogicalOr, op_LogicalAnd, op_Not, op_Equal, op_NotEqual, op_Less, op_LessEqual, op_Greater,op_GreaterEqual, kw_type,kw_while,kw_for ,kw_if, kw_elif, kw_else, punc_Semicolon, punc_LeftParen, punc_RightParen, op_Plus, op_Minus, op_Multiply, op_Divide, op_Modulo, op_Exp, Identifier, Number, kw_let, kw_in, punc_Comma, punc_LeftBrace, punc_RightBrace, Assignment, arrow, kw_function
 
 
-NonTerminals: Program, StmtList, Statement, Expression, ExpAditiva, ExpAditivaPrime, ExpMultiplicativa, ExpMultiplicativaPrime, ExpExpon, ExpExponPrime, Primary, VarDeclaration, AssignmentList, AssignmentListTail, AssignmentDecl, Block, Expbody, ExpList, ExpListTail, , FuncDef,ParamList,ParamListTail,FuncTail,ifExp ,elif_list,While_loop,For_loop,TypeDef,memberList,memberTail,member,methodSignaturePrime,BooleanExpression, BooleanExpressionPrime, BooleanTerm, BooleanTermPrime, BooleanFactor, RelationalExpression, RelationalExpressionPrime,FunCallPrime,ArgList,ArgListTail,ArgType,MemberAccessPrime
+NonTerminals: Program, StmtList, Statement, Expression, ExpAditiva, ExpAditivaPrime, ExpMultiplicativa, ExpMultiplicativaPrime, ExpExpon, ExpExponPrime, Primary, VarDeclaration, AssignmentList, AssignmentListTail, AssignmentDecl, Block, Expbody, ExpList, ExpListTail, , FuncDef,ParamList,ParamListTail,FuncTail,ifExp ,elif_list,While_loop,For_loop,TypeDef,memberList,memberTail,member,methodSignaturePrime,BooleanExpression, BooleanExpressionPrime, BooleanTerm, BooleanTermPrime, BooleanFactor, RelationalExpression, RelationalExpressionPrime,FunCallPrime,ArgList,ArgListTail,ArgType,MemberAccessPrime,TypeAnnotationOpt,DestructiveExpr,LeftRef,DestructiveExprime
 
 
 
@@ -16,23 +16,30 @@ Statement -> Block punc_Semicolon
 Statement -> FuncDef punc_Semicolon
 Statement -> TypeDef punc_Semicolon
 
-TypeDef -> kw_type Identifier ArgType Inheritance punc_LeftBrace memberList punc_RightBrace
+TypeDef -> kw_type Identifier ArgType  punc_LeftBrace memberList punc_RightBrace
 
 ArgType -> punc_LeftParen ParamList punc_RightParen | ε
 
 
 memberList -> member memberList | ε
-member ->  Identifier memberTail punc_Semicolon 
+member ->  Identifier TypeAnnotationOpt memberTail punc_Semicolon 
 memberTail -> Assignment Expression  |methodSignaturePrime 
 
 FuncDef  -> kw_function Identifier methodSignaturePrime
-methodSignaturePrime ->  punc_LeftParen ParamList punc_RightParen FuncTail
+methodSignaturePrime ->  punc_LeftParen ParamList punc_RightParen TypeAnnotationOpt FuncTail
 FuncTail  -> arrow Expression | Block | ε
-ParamList    -> Identifier ParamListTail | ε
-ParamListTail  -> punc_Comma Identifier ParamListTail | ε
+ParamList    -> Identifier TypeAnnotationOpt  ParamListTail | ε
+ParamListTail  -> punc_Comma Identifier TypeAnnotationOpt ParamListTail | ε
 
 
-Expression -> BooleanExpression
+Expression -> BooleanExpression DestructiveExprime
+
+DestructiveExprime -> op_destruc Expression  | ε
+
+
+
+LeftRef -> Identifier MemberAccessPrime
+
 Expression -> VarDeclaration
 Expression -> ifExp
 Expression ->  While_loop
@@ -46,19 +53,21 @@ elif_list -> kw_elif punc_LeftParen Expression punc_RightParen Expbody elif_list
 
 VarDeclaration -> kw_let AssignmentList kw_in Expbody
 
+
 Expbody -> Expression
 Expbody -> Block
 AssignmentList -> AssignmentDecl AssignmentListTail
 AssignmentListTail -> punc_Comma AssignmentDecl AssignmentListTail
 AssignmentListTail -> ε
-AssignmentDecl -> Identifier Assignment Expression
+AssignmentDecl -> Identifier  TypeAnnotationOpt Assignment Expression
+
+TypeAnnotationOpt -> punc_Colon Identifier | ε
 
 
 Block -> punc_LeftBrace ExpList punc_RightBrace
 
-ExpList -> Expression ExpListTail
-ExpListTail -> punc_Semicolon Expression punc_Semicolon ExpListTail
-ExpListTail -> ε
+ExpList -> Expression  punc_Semicolon ExpListTail
+ExpListTail ->  Expression punc_Semicolon ExpListTail | ε
 
 
 
@@ -106,6 +115,3 @@ FunCallPrime -> punc_LeftParen ArgList punc_RightParen | ε
 ArgList -> Expression ArgListTail | ε
 
 ArgListTail -> punc_Comma Expression ArgListTail  | ε
-
-
-x().

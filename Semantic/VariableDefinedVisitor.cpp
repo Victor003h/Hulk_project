@@ -5,9 +5,7 @@
 class VariableDefindedVisitor:public Visitor
 {
 
-   
-
-    public:
+       public:
 
         Context* context;
         Type* currentType=nullptr;
@@ -28,7 +26,6 @@ class VariableDefindedVisitor:public Visitor
         void visit(TypeNode* node)  override
         {
               
-            
             if(context->exist_Type(node->name.lexeme))
             {
                 std::string msg="The class"+ node->name.lexeme+" already exists";
@@ -148,7 +145,7 @@ class VariableDefindedVisitor:public Visitor
             }
             
             node->body->accept(*this);
-            node->type=node->body->getType();
+          //  node->type=node->body->getType();
     
             context= context->RemoveContext(); 
 
@@ -167,7 +164,7 @@ class VariableDefindedVisitor:public Visitor
             }
             node->body->accept(*this);
 
-            node->type=node->body->getType();
+           // node->type=node->body->getType();
 
             context=context->RemoveContext();
             
@@ -185,32 +182,29 @@ class VariableDefindedVisitor:public Visitor
         {
             node->left->accept(*this);
             node->right->accept(*this);
-            std::set<std::string> boolop={"<","<=",">",">=","==","!="};
-            std::set<std::string> aritop={"+","-","/","*","^","%"};
+            //std::set<std::string> boolop={"<","<=",">",">=","==","!="};
+           // std::set<std::string> aritop={"+","-","/","*","^","%"};
 
-             if(boolop.find(node->op.lexeme)!=boolop.end())
-             {
-                if(node->left->getType()=="Object" &&node->right->getType()=="Number")
-                    node->left->setType("Number");
-                else if (node->right->getType()=="Object" &&node->left->getType()=="Number")
-                        node->left->setType("Number");
+            //  if(boolop.find(node->op.lexeme)!=boolop.end())
+            //  {
+            //     if(node->left->getType()=="Object" &&node->right->getType()=="Number")
+            //         node->left->setType("Number");
+            //     else if (node->right->getType()=="Object" &&node->left->getType()=="Number")
+            //             node->left->setType("Number");
                 
-
-
-
-             }
+            //  }
 
             
-            if(node->left->getType()!=node->right->getType())
-            {
-                std::string msg="los tipos no coinciden ";
-                errorHandler.reportError(node->op,msg);
-                return;
-            }
-            if(boolop.find(node->op.lexeme)!=boolop.end())
-                node->type="Boolean";
-            else
-                node->type=node->left->getType();
+            // if(node->left->getType()!=node->right->getType())
+            // {
+            //     std::string msg="los tipos no coinciden ";
+            //     errorHandler.reportError(node->op,msg);
+            //     return;
+            // }
+            // if(boolop.find(node->op.lexeme)!=boolop.end())
+            //     node->type="Boolean";
+            // else
+            //     node->type=node->left->getType();
     
         };
         
@@ -224,7 +218,7 @@ class VariableDefindedVisitor:public Visitor
             }
 
             auto type=context->GetTypeOfAtribute(node->value.lexeme);
-            node->type=type->name;            
+          //  node->type=type->name;            
 
         }; 
 
@@ -249,18 +243,18 @@ class VariableDefindedVisitor:public Visitor
             node->defaultExp->accept(*this);
             exp_types.push_back(node->defaultExp->getType());
             
-            node->type=context->getLeastCommonAncestor(exp_types);
+          //  node->type=context->getLeastCommonAncestor(exp_types);
         };
 
         void visit(WhileExpression* node)   
         {
             node->condition->accept(*this);
-            if(node->condition->getType()!="Boolean")
-            {
-                std::string msg="the condition ,bust be bool  ";
-                errorHandler.reportError(Token(),msg);
-                return;
-            }
+            // if(node->condition->getType()!="Boolean")
+            // {
+            //     std::string msg="the condition ,bust be bool  ";
+            //     errorHandler.reportError(Token(),msg);
+            //     return;
+            // }
             node->body->accept(*this);
 
         };
@@ -295,12 +289,12 @@ class VariableDefindedVisitor:public Visitor
                 auto arg=node->arguments[i];
                 arg->accept(*this);
 
-                if(arg->getType()!=meth->m_paramaters[i].type)
-                {
-                    std::string msg="invalid type  of argument in function "+ node->id.lexeme;
-                    errorHandler.reportError(node->id,msg);
-                    return;
-                }
+                // if(arg->getType()!=meth->m_paramaters[i].type)
+                // {
+                //     std::string msg="invalid type  of argument in function "+ node->id.lexeme;
+                //     errorHandler.reportError(node->id,msg);
+                //     return;
+                // }
             }
         };
 
@@ -326,7 +320,8 @@ class VariableDefindedVisitor:public Visitor
 
             }
             
-            node->setType(meth->getType());
+          //  node->setType(meth->getType());
         };
 
+        void visit(DestructiveAssignNode* node) {}
 };

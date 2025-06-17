@@ -26,11 +26,11 @@ public:
     llvm::IRBuilder<> irBuilder;                 // Constructor para crear instrucciones IR
     llvm::Module llvmModule;                     // Módulo IR de LLVM (una unidad de compilación)
 
+    std::unordered_map<std::string, llvm::StructType*> namedTypes;
+
     // Tabla de símbolos globales para variables (por ejemplo, "self") o constantes globales
     std::unordered_map<std::string, llvm::Value*> globalVariables;
-    // Pila para el paso de valores durante la travesía del AST
-    std::vector<llvm::Value*> valueStack;
-
+    
     // Constructor: inicializa el IRBuilder y el módulo
     CodeGenerationContext()
         : irBuilder(llvmContext),
@@ -84,6 +84,27 @@ public:
         }
         return nullptr;
     }
+
+    // Esta función te permite obtener (o crear) la cadena de formato "%g\n" de forma global.
+    llvm::Value* getFormatString()
+    {
+        llvm::GlobalVariable* formatVar = llvmModule.getNamedGlobal("formatStr");
+        if (!formatVar) 
+        {
+            llvm::Constant* formatConst = llvm::ConstantDataArray::getString(llvmModule.getContext(), "%g\n", true);
+            formatVar = new llvm::GlobalVariable(
+                llvmModule,
+                formatConst->getType(),
+                true, // Es una constante
+                llvm::GlobalValue::PrivateLinkage,
+                formatConst,
+                "formatStr"
+            );
+        }
+        // Asegurarse de obtener un tipo pointer a i8
+        return irBuilder.CreateBitCast(formatVar, llvm::PointerType::get(llvm::Type::getInt8Ty(llvmModule.getContext()), 0));
+    }
+
 };
 
 
@@ -113,9 +134,12 @@ public:
     void visit(LetExpression* node)         ;
     void visit(UnaryExpression* node)       ;    
     void visit(FunCallNode* node)            ;
-     void visit(MemberCall* node)        ;
+    void visit(MemberCall* node)        ;
+    void visit(DestructiveAssignNode* node)        ;
 
 };
+
+
 
 void CodeGenerationContext::generateIR(AstNode* root)
 {
@@ -152,9 +176,10 @@ void CodeGenerationContext::generateIR(AstNode* root)
     root->accept(visitor);
 
 
-        auto val=valueStack.back();
+        auto val=visitor.lastValue;
+        if(!val)    return;
         if (val->getType()->isDoubleTy()) { // Number
-            llvm::Value* format = irBuilder.CreateGlobalStringPtr("%g\n");
+            llvm::Value* format = getFormatString();
             irBuilder.CreateCall(llvmModule.getFunction("printf"), {format, val});
         } else if (val->getType()->isIntegerTy(1)) { // Boolean
             llvm::Value* str = irBuilder.CreateSelect(
@@ -167,7 +192,7 @@ void CodeGenerationContext::generateIR(AstNode* root)
             irBuilder.CreateCall(llvmModule.getFunction("puts"), {val});
         }
     
-    valueStack.clear();
+   
 
     irBuilder.CreateRet(llvm::ConstantInt::get(llvmContext, llvm::APInt(32, 0)));
     llvm::verifyFunction(*mainFunc);
@@ -195,9 +220,56 @@ void LlvmVisitor::visit(ProgramNode* node)
 
 
  };
-void LlvmVisitor::visit(TypeNode* node)              {};
 
+void LlvmVisitor::visit(TypeNode* node) 
+{
+    auto& ctx = cgContext;
 
+    // 1. Crear estructura con atributos
+    std::vector<llvm::Type*> memberTypes;
+    for (auto* attr : node->atributes) {
+        // Supongamos que todos los atributos son double
+        memberTypes.push_back(llvm::Type::getDoubleTy(ctx.llvmContext));
+    }
+
+    llvm::StructType* classType = llvm::StructType::create(ctx.llvmContext, memberTypes, node->name.lexeme);
+    ctx.namedTypes[node->name.lexeme] = classType;
+
+    // 2. Crear función constructor
+    std::vector<llvm::Type*> ctorArgs(memberTypes);
+    llvm::FunctionType* ctorType = llvm::FunctionType::get(
+        llvm::PointerType::getUnqual(classType), // return: pointer to struct
+        ctorArgs,
+        false
+    );
+
+    llvm::Function* ctorFunc = llvm::Function::Create(
+        ctorType,
+        llvm::Function::ExternalLinkage,
+        node->name.lexeme + "_ctor",
+        ctx.llvmModule
+    );
+
+    llvm::BasicBlock* entry = llvm::BasicBlock::Create(ctx.llvmContext, "entry", ctorFunc);
+    ctx.irBuilder.SetInsertPoint(entry);
+
+    llvm::Value* self = ctx.irBuilder.CreateAlloca(classType, nullptr, "self");
+
+    int index = 0;
+    for (llvm::Argument& arg : ctorFunc->args()) {
+        arg.setName("arg" + std::to_string(index));
+        llvm::Value* fieldPtr = ctx.irBuilder.CreateStructGEP(classType, self, index, "ptr");
+        ctx.irBuilder.CreateStore(&arg, fieldPtr);
+        ++index;
+    }
+
+    ctx.irBuilder.CreateRet(self);
+
+    // 3. Visitar los métodos (cada uno se convierte en función)
+    for (auto* method : node->methods) {
+        method->accept(*this);  // Delegamos a visit(FunctionNode*)
+    }
+}
 
 void LlvmVisitor::visit(BlockNode* node) 
 {
@@ -212,7 +284,7 @@ void LlvmVisitor::visit(BlockNode* node)
 
     lastValue=value;
 
-    cgContext.valueStack.push_back(lastValue);
+    
 };
 
 void LlvmVisitor::visit(BinaryExpression* node)     
@@ -246,7 +318,7 @@ void LlvmVisitor::visit(BinaryExpression* node)
         else if(node->op.lexeme=="<")
             lastValue = cgContext.irBuilder.CreateFCmpULT(leftvalue, rightvalue, "gttmp");
         else if(node->op.lexeme=="<=")
-            lastValue = cgContext.irBuilder.CreateFCmpUGE(leftvalue, rightvalue, "gttmp");
+            lastValue = cgContext.irBuilder.CreateFCmpULE(leftvalue, rightvalue, "gttmp");
        
         else if(node->op.lexeme=="=="||node->op.lexeme=="!=" )
         {
@@ -279,7 +351,7 @@ void LlvmVisitor::visit(BinaryExpression* node)
                 lastValue = nullptr;   
         }
 
-        cgContext.valueStack.push_back(lastValue);
+        
 
     };
 
@@ -296,7 +368,7 @@ void LlvmVisitor::visit(IdentifierNode* node)
      
     llvm::Value* value = cgContext.irBuilder.CreateLoad(varType, varAlloca, node->value.lexeme);
     lastValue = value;
-    cgContext.valueStack.push_back(lastValue);
+    
 
 };
 
@@ -305,6 +377,8 @@ void LlvmVisitor::visit(AtributeNode* node)          {};
 
 void LlvmVisitor::visit(MethodNode* node) 
 {
+    llvm::BasicBlock* prevBlock = cgContext.irBuilder.GetInsertBlock();
+
     std::vector<llvm::Type*> paramTypes(node->params.size(), llvm::Type::getDoubleTy(cgContext.llvmContext)); // Usamos double por defecto
 
     llvm::FunctionType* funcType = llvm::FunctionType::get(
@@ -350,9 +424,13 @@ void LlvmVisitor::visit(MethodNode* node)
         cgContext.irBuilder.CreateRet(llvm::ConstantFP::get(cgContext.llvmContext, llvm::APFloat(0.0))); // default
     }
 
-    cgContext.valueStack.push_back(lastValue);
+    
 
     cgContext.popLocalScope(); // restaurar scope anterior
+
+    cgContext.irBuilder.SetInsertPoint(prevBlock);
+
+
 }
 
 
@@ -525,11 +603,55 @@ void LlvmVisitor::visit(IfExpression* node) {
         lastValue = nullptr;
     }
 
-     cgContext.valueStack.push_back(lastValue);
+    
     
 }
 
-void LlvmVisitor::visit(WhileExpression* node)       {};
+void LlvmVisitor::visit(WhileExpression* node) 
+{
+
+    llvm::Function* function = cgContext.irBuilder.GetInsertBlock()->getParent();
+
+    // Crear bloques para el ciclo while
+    llvm::BasicBlock* condBlock = llvm::BasicBlock::Create(cgContext.llvmContext, "while.cond", function);
+    llvm::BasicBlock* bodyBlock = llvm::BasicBlock::Create(cgContext.llvmContext, "while.body");
+    llvm::BasicBlock* endBlock  = llvm::BasicBlock::Create(cgContext.llvmContext, "while.end");
+
+    // Brincar al bloque de condición
+    cgContext.irBuilder.CreateBr(condBlock);
+    cgContext.irBuilder.SetInsertPoint(condBlock);
+
+    // Generar el código de la condición
+    node->condition->accept(*this); // Asume que el resultado está en lastValue
+    llvm::Value* condValue = lastValue;
+
+    // Convertir condición a booleano (i1)
+    if (condValue->getType()->isIntegerTy(1) == false) {
+        condValue = cgContext.irBuilder.CreateICmpNE(
+            condValue,
+            llvm::ConstantInt::get(condValue->getType(), 0),
+            "while.cond.bool"
+        );
+    }
+
+    // Branch dependiendo del resultado de la condición
+    cgContext.irBuilder.CreateCondBr(condValue, bodyBlock, endBlock);
+
+   // Insertar y entrar al cuerpo del while
+
+    bodyBlock->insertInto(function); // Agrega manualmente
+    cgContext.irBuilder.SetInsertPoint(bodyBlock);
+    node->body->accept(*this);
+    cgContext.irBuilder.CreateBr(condBlock); // Loop back
+
+    // Insertar y moverse al bloque final
+    endBlock->insertInto(function);
+    cgContext.irBuilder.SetInsertPoint(endBlock);
+
+    lastValue = nullptr; 
+
+    
+};
 
 void LlvmVisitor::visit(ForExression* node)          {};
 
@@ -553,7 +675,7 @@ void LlvmVisitor::visit(LetExpression* node)
     
     node->body->accept(*this);
     auto bodyvalue=lastValue;
-    cgContext.valueStack.push_back(bodyvalue);
+   
     lastValue=bodyvalue;
     cgContext.popLocalScope();
 
@@ -561,7 +683,42 @@ void LlvmVisitor::visit(LetExpression* node)
 
 void LlvmVisitor::visit(UnaryExpression* node)       {}; 
 
-void LlvmVisitor::visit(FunCallNode* node)        {};  
+void LlvmVisitor::visit(FunCallNode* node) {
+    // Buscar la función por su nombre
+    llvm::Function* calleeFunc = cgContext.llvmModule.getFunction(node->id.lexeme);
+    
+    if (!calleeFunc) {
+        std::cerr << "Error: función '" << node->id.lexeme << "' no definida.\n";
+        lastValue = nullptr;
+        return;
+    }
+
+    // Evaluar argumentos
+    std::vector<llvm::Value*> args;
+    for (AstNode* argNode : node->arguments) {
+        argNode->accept(*this);  // llena lastValue
+        if (!lastValue) {
+            std::cerr << "Error: argumento inválido para llamada a función\n";
+            lastValue = nullptr;
+            return;
+        }
+        args.push_back(lastValue);
+    }
+
+    // Comprobación de aridad
+    if (calleeFunc->arg_size() != args.size()) {
+        std::cerr << "Error: número de argumentos no coincide con la función '" << node->id.lexeme << "'\n";
+        lastValue = nullptr;
+        return;
+    }
+
+    // Generar llamada
+    lastValue = cgContext.irBuilder.CreateCall(calleeFunc, args, "calltmp");
+  
+    // Puedes establecer el tipo de retorno si tienes un sistema de tipos
+    // node->setType(...);
+}
+
 
 void LlvmVisitor::visit(MemberCall* node)        {};
 
@@ -572,7 +729,7 @@ void LlvmVisitor::visit(LiteralNode* node)
         double numVal = std::stod(node->value.lexeme);
         lastValue = llvm::ConstantFP::get(cgContext.llvmContext, llvm::APFloat(numVal));
 
-        cgContext.valueStack.push_back(lastValue);
+      
         return;
     }
     else if(node->type=="String")
@@ -583,9 +740,39 @@ void LlvmVisitor::visit(LiteralNode* node)
     {
         bool b= node->value.lexeme=="true";
         lastValue=llvm::ConstantInt::get(llvm::Type::getInt1Ty(cgContext.llvmContext),b);
-        cgContext.valueStack.push_back(lastValue);
         return;
     }
 
 
+}
+
+
+void LlvmVisitor::visit(DestructiveAssignNode* node) 
+{
+    node->rhs->accept(*this);
+    llvm::Value* right=lastValue;
+
+    llvm::Value* ptr = nullptr;
+
+
+     if (auto idNode = dynamic_cast<IdentifierNode*>(node->lhs)) 
+     {
+       
+        ptr = cgContext.getLocalVariable(idNode->value.lexeme);
+        if (!ptr) 
+        {
+            std::cerr << "Error: variable '" << idNode->value.lexeme << "' no definida\n";
+            return;
+        }
+
+    } 
+    else {
+        std::cerr << "Error: LHS de := no soportado\n";
+        return;
+    }
+
+    cgContext.irBuilder.CreateStore(right,ptr);
+
+    lastValue=right;
+    
 }

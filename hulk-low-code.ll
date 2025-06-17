@@ -1,7 +1,9 @@
 ; ModuleID = 'main_module'
 source_filename = "main_module"
 
-@0 = private unnamed_addr constant [4 x i8] c"%g\0A\00", align 1
+%0 = type { double, double }
+
+@formatStr = private constant [4 x i8] c"%g\0A\00"
 
 declare i32 @printf(ptr, ...)
 
@@ -11,16 +13,24 @@ define i32 @main() {
 entry:
 }
 
-define double @suma(double %x, double %y) {
+define ptr @_ctor(double %arg0, double %arg1) {
 entry:
-  %y2 = alloca double, align 8
-  %x1 = alloca double, align 8
-  store double %x, ptr %x1, align 8
-  store double %y, ptr %y2, align 8
-  %x3 = load double, ptr %x1, align 8
-  %y4 = load double, ptr %y2, align 8
-  %addtmp = fadd double %x3, %y4
-  ret double %addtmp
-  %0 = call i32 (ptr, ...) @printf(ptr @0, double %addtmp)
+  %self = alloca %0, align 8
+  %ptr = getelementptr inbounds %0, ptr %self, i32 0, i32 0
+  store double %arg0, ptr %ptr, align 8
+  %ptr1 = getelementptr inbounds %0, ptr %self, i32 0, i32 1
+  store double %arg1, ptr %ptr1, align 8
+  ret ptr %self
+  %0 = call i32 (ptr, ...) @printf(ptr @formatStr, double 2.000000e+00)
   ret i32 0
+}
+
+define double @getX() {
+entry:
+  ret double 3.000000e+00
+}
+
+define double @getY() {
+entry:
+  ret double 2.000000e+00
 }

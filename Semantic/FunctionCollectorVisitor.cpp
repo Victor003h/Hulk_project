@@ -66,6 +66,6 @@ class FunctionCollectorVisitor: public Visitor
     void visit(UnaryExpression* node)      {};
     void visit(FunCallNode* node)        {};
     void visit(MemberCall* node)        {};
-
+    void visit(DestructiveAssignNode* node) {};
 };
 

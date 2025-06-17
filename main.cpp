@@ -4,11 +4,19 @@
 #include "./CodeGen/CodeGenerationContext.hpp"
 #include <iostream>
 
-
-
+// 329*2 
+// compute=200  // 395
 int main() {
     std::string input=R"( 
-      
+    type Point(x,y) {
+    x = x;
+    y = y;
+
+    getX() => 3;
+    getY() => 2;
+
+    
+};
     )";
     
     ErrorHandler error;
@@ -38,21 +46,22 @@ int main() {
     ast->print();
 
 
-    // SemanticAnalizer semantic;
-    // semantic.errorHandler=error;
+    SemanticAnalizer semantic;
+    semantic.errorHandler=error;
 
-    // semantic.check(ast);
-    // if(semantic.errorHandler.hasErrors())
-    // {
-    //   semantic.errorHandler.printErrors();
-    // };
+    semantic.check(ast);
+    if(semantic.errorHandler.hasErrors())
+    {
+      semantic.errorHandler.printErrors();
+      return 0;
+    };
 
 
-    // CodeGenerationContext codegen;
+    CodeGenerationContext codegen;
 
-    // codegen.generateIR(ast);
+    codegen.generateIR(ast);
 
-    // codegen.dumpIR();
-
+    codegen.dumpIR();
+    return 0;
 
 }
