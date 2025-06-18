@@ -216,12 +216,12 @@ void CodeGenerationContext::generateIR(AstNode* root)
 
 void CodeGenerationContext::dumpIR(const std::string &filename) {
         std::error_code EC;
-        llvm::raw_fd_ostream dest(filename, EC, llvm::sys::fs::OF_None);
+        llvm::raw_fd_ostream out("hulk/hulk.ll", EC, llvm::sys::fs::OF_Text);
         if (EC) {
             llvm::errs() << "Error al abrir el archivo: " << EC.message();
             return;
         }
-        llvmModule.print(dest, nullptr);
+        llvmModule.print(out, nullptr);
 }
 
 

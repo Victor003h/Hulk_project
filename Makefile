@@ -1,30 +1,31 @@
-CXX=clang++
-CXXFLAGS=-std=c++17 -I. -Wall
+CXX = g++
+CXXFLAGS = -std=c++17 -I./src -Wall -g
+SRC = $(wildcard src/*.cpp)
+OBJ = $(SRC:.cpp=.o)
+BIN = hulk/hulk.exe
+LLFILE = hulk/hulk.ll
 
-# Ajusta esto con el path donde instalaste LLVM
-LLVM_DIR="C:/Program Files/LLVM"
+all: execute
 
-# Paths y flags para LLVM
-LLVM_INCLUDE=-I$(LLVM_DIR)/include
-LLVM_LIB=-L$(LLVM_DIR)/lib
-LLVM_FLAGS=-lLLVM
+# Compilar el ejecutable
+$(BIN): main.cpp
+	@mkdir -p hulk
+	$(CXX) $(CXXFLAGS) main.cpp -o $(BIN) `llvm-config --cxxflags --ldflags --libs core` -Wl,-subsystem,console
 
-# Targets individuales
-lexer:
-	$(CXX) $(CXXFLAGS) Lexer/main.cpp -o lexer.exe
+# Regla para compilar y generar el .ll (ejecutando el binario)
+compile: $(BIN)
+	@echo "Generando archivo LLVM IR: $(LLFILE)"
+	$(BIN)
 
-parser:
-	$(CXX) $(CXXFLAGS) Parser/main.cpp -o parser.exe
+# Ejecutar el archivo .ll, si no existe, se genera primero
+execute: $(LLFILE)
+	@echo "Ejecutando LLVM IR: $(LLFILE)"
+	lli $(LLFILE)
 
-semantic:
-	$(CXX) $(CXXFLAGS) Semantic/main.cpp -o semantic.exe
+# El archivo .ll depende del ejecutable y se genera al ejecutarlo
+$(LLFILE): $(BIN)
+	@echo "Archivo LLVM IR no existe, generando..."
+	$(BIN)
 
-codegen:
-	$(CXX) $(CXXFLAGS) $(LLVM_INCLUDE) CodeGen/main.cpp -o codegen.exe $(LLVM_LIB) $(LLVM_FLAGS)
-
-# Target para compilar todo
-all:	lexer	parser	semantic	codegen
-
-# Limpiar binarios
 clean:
-	del /Q *.exe
+	rm -f hulk/*.exe hulk/*.ll

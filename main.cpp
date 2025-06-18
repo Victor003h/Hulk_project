@@ -8,29 +8,19 @@
 #include "./CodeGen/CodeGenerationContext.hpp"
 
 
-int main(int argc, char* argv[]) {
-    if (argc < 2) {
-        std::cerr << "Uso: " << argv[0] << " <archivo.hulk>" << std::endl;
+int main() {
+   
+    std::string inputFile = "script.hulk";  // Usa uno fijo o por argv
+    std::ifstream file(inputFile);
+    if (!file.is_open()) {
+        std::cerr << "No se pudo abrir el archivo: " << inputFile << std::endl;
         return 1;
     }
-
-
-    // 1. Obtener el nombre del archivo .hulk desde la línea de comandos.
-    std::string filename = argv[1];
-
-    // 2. Abrir el archivo y leer su contenido en un std::string.
-    std::ifstream inputFile(filename);
-    if (!inputFile.is_open()) {
-        std::cerr << "Error al abrir el archivo: " << filename << std::endl;
-        return 1;
-    }
-
-    std::stringstream buffer;
-    buffer << inputFile.rdbuf();
-    std::string input = buffer.str();
-    inputFile.close();
-
+    std::ostringstream buffer;
+    buffer <<file.rdbuf();
+    std::string input=buffer.str();
     
+
     ErrorHandler error;
     Lexer lexer(error);
     auto tokens=lexer.scanTokens(input);
@@ -64,14 +54,15 @@ int main(int argc, char* argv[]) {
       return 0;
     };
 
+    std::filesystem::create_directory("hulk");
 
     CodeGenerationContext codegen;
 
     codegen.generateIR(ast);
 
-    codegen.dumpIR();
+    codegen.dumpIR("output.ll");
     return 0;
 
 
-    return 0;
+  
 }
