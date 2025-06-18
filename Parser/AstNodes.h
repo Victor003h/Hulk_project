@@ -22,6 +22,7 @@ class UnaryExpression;
 class FunCallNode;
 class MemberCall;
 class DestructiveAssignNode ;
+class TypeInstantiation;
 
 class Visitor {
 public:
@@ -42,7 +43,8 @@ public:
     virtual void visit(UnaryExpression* node)         = 0;
     virtual void visit(FunCallNode* node)        = 0;
     virtual void visit(MemberCall* node)        = 0;
-     virtual void visit(DestructiveAssignNode* node)        = 0;
+    virtual void visit(DestructiveAssignNode* node)        = 0;
+    virtual void visit(TypeInstantiation* node)        = 0;
 };
 
 class AstNode {
@@ -167,6 +169,8 @@ public:
     std::vector<AstNode*> atributes;
     std::vector<AstNode*> methods;
     std::vector<AstNode*> args;
+    Token parentName;
+    std::vector<AstNode*> parent_args;
 
 
     TypeNode(Token name, std::vector<AstNode*> atributes, std::vector<AstNode*> methods,std::vector<AstNode*> args)
@@ -177,15 +181,23 @@ public:
     void print(int indent = 0) const override {
         std::string spacing(indent, ' ');
         std::cout << spacing << "Type Expression: " << name.lexeme << std::endl;
+        if(parentName.lexeme!="")
+        {
+            std::cout << spacing << "Parent: " << parentName.lexeme << std::endl;
+            std::cout << spacing << "ParentArgs: " << std::endl;
+            for (const auto& arg : parent_args) {
+            arg->print(indent + 4);
+        }
+        }
         std::cout << spacing << "Arguments: " << std::endl;
         for (const auto& arg : args) {
             arg->print(indent + 4);
         }
-        std::cout << spacing << "  Atributes:" << std::endl;
+        std::cout << spacing << " Atributes:" << std::endl;
         for (const auto& atrib : atributes) {
             atrib->print(indent + 4);
         }
-        std::cout << spacing << "  Methods:" << std::endl;
+        std::cout << spacing << " Methods:" << std::endl;
         for (const auto& meth : methods) {
             meth->print(indent + 4);
         }
@@ -494,4 +506,37 @@ public:
     void accept(Visitor& visitor) override {
         visitor.visit(this);
     }
+};
+
+
+class TypeInstantiation:public AstNode
+{
+    public:
+    Token typeName; 
+    std::vector<AstNode*> arguments; 
+    std::string type = "Object"; 
+
+    TypeInstantiation(const Token& id, const std::vector<AstNode*>& arguments)
+        : typeName(id), arguments(arguments) {type=id.lexeme;}
+
+    void print(int indent = 0) const override {
+        std::string spacing(indent, ' ');
+        std::cout << spacing << "TypeInstatiation: " << typeName.lexeme <<std::endl ;
+         std::cout << spacing << "Arg: " <<std::endl  ;
+        for (size_t i = 0; i < arguments.size(); ++i) {
+            arguments[i]->print(indent+4);
+        }
+     
+    }
+
+    std::string getType() override {
+        return type;
+    }
+
+    void accept(Visitor &visitor) override {
+            visitor.visit(this);
+
+        }
+        void setType(std::string t){type=t;}
+        
 };

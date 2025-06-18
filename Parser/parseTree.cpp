@@ -179,14 +179,25 @@ class AstBuilderVisitor: public ParseTreeVisitor
             
             if(node->m_value->value=="TypeDef")
             {
-                Token name= node->m_children[3]->m_token;
+                Token name= node->m_children[5]->m_token;
                 std::vector<AstNode*> args={};
+                Token parentName;
+                std::vector<AstNode*> parent_args;
                 if(!(node->m_children[3]->m_children.empty()))
                 {
-                    args=ParamList(node->m_children[3]->m_children[1]);
+                    parentName= node->m_children[3]->m_children[3]->m_token;
+                    parent_args=ArgList(node->m_children[3]->m_children[1]);
+                }
+
+                if(!(node->m_children[4]->m_children.empty()))
+                {
+                    args=ParamList(node->m_children[4]->m_children[1]);
                 }
                 auto [atr,meth]= GetMemberList(node->m_children[1]);
-                return new TypeNode(name,atr,meth,args);
+                auto type= new TypeNode(name,atr,meth,args);
+                type->parentName=parentName;
+                type->parent_args=parent_args;
+                return type;
                 
             }
 
@@ -221,6 +232,12 @@ class AstBuilderVisitor: public ParseTreeVisitor
                 }
             }
 
+            if (node->m_value->value == "TypeInstantiation")
+            {
+                Token type=node->m_children[1]->m_token;
+                std::vector<AstNode*> arguments=ArgList(node->m_children[0]->m_children[1]);
+                return new TypeInstantiation(type,arguments);
+            }
 
 
             if(node->m_value->value=="ExpAditiva")
@@ -256,9 +273,9 @@ class AstBuilderVisitor: public ParseTreeVisitor
                     // 1. Creamos el nodo base: puede ser identifier o llamada a función
                     AstNode* base;
                     if (!funCallPrime->m_children.empty() &&
-                        funCallPrime->m_children[2]->m_value->value == "punc_LeftParen") {
+                        funCallPrime->m_children[0]->m_children[2]->m_value->value == "punc_LeftParen") {
                         // Es una llamada a función: x(...)
-                        std::vector<AstNode*> args = ArgList(funCallPrime->m_children[1]);
+                        std::vector<AstNode*> args = ArgList(funCallPrime->m_children[0]->m_children[1]);
                         base = new FunCallNode(identifierNode->m_token, args);
                     } else {
                         // Solo es un identificador
@@ -266,11 +283,10 @@ class AstBuilderVisitor: public ParseTreeVisitor
                     }
 
                     // 2. Ahora procesamos encadenamiento de miembros: .x.y().z
-                    return parseMemberAccessChain(base, memberAccessPrime);
+                    return MemberAccessChain(base, memberAccessPrime);
 
                 }
                 
-
                 if(node->m_children[0]->m_value->value=="Number")
                 {
                    auto l= new LiteralNode(node->m_children[0]->m_token);
@@ -565,7 +581,7 @@ class AstBuilderVisitor: public ParseTreeVisitor
             return list;
         }
 
-        AstNode* parseMemberAccessChain(AstNode* base, ParseNode* memberAccessPrime) 
+        AstNode* MemberAccessChain(AstNode* base, ParseNode* memberAccessPrime) 
         {
             if (memberAccessPrime->m_children.empty()) return base;
 
@@ -577,9 +593,9 @@ class AstBuilderVisitor: public ParseTreeVisitor
 
             AstNode* member;
             if (!funCallPrime->m_children.empty() &&
-                funCallPrime->m_children[2]->m_value->value == "punc_LeftParen") {
+                funCallPrime->m_children[0]->m_children[2]->m_value->value == "punc_LeftParen") {
                 // Es una función miembro: .x()
-                std::vector<AstNode*> args = ArgList(funCallPrime->m_children[1]);
+                std::vector<AstNode*> args = ArgList(funCallPrime->m_children[0]->m_children[1]);
                 member = new FunCallNode(memberId->m_token, args);
             } else {
                 // Es una propiedad: .x
@@ -587,7 +603,7 @@ class AstBuilderVisitor: public ParseTreeVisitor
             }
 
             AstNode* access = new MemberCall(base, member);
-            return parseMemberAccessChain(access, nextMemberAccess); // recursión
+            return MemberAccessChain(access, nextMemberAccess); // recursión
 }
 
     };

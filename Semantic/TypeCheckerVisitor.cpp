@@ -23,7 +23,8 @@ class TypeCheckerVisitor:Visitor
     
         void visit(TypeNode* node)  override
         {
-              
+        
+
             if(context->exist_Type(node->name.lexeme))
             {
                 std::string msg="The class"+ node->name.lexeme+" already exists";
@@ -34,13 +35,54 @@ class TypeCheckerVisitor:Visitor
            auto lastType=currentType;
 
            context=context->createChildContext();
+
+           Type* parent=context->GetType("Object");
             
+           if(node->parentName.lexeme!="")
+           {
+            if(!context->exist_Type(node->parentName.lexeme))
+            {
+                std::string msg="The class"+ node->parentName.lexeme+"  is not defined";
+                errorHandler.reportError(node->parentName,msg);
+                return;
+            }
+            parent= context->GetType(node->parentName.lexeme);
+
+            if(node->parent_args.size()!= parent->atributes.size())
+            {
+                std::string msg="Invalid value of arguments";
+                errorHandler.reportError(node->parentName,msg);
+                return;
+            }
+            
+           }
 
             currentType=context->CreateType(node->name.lexeme);
+            currentType->parent=parent;
+
+            for(auto arg:node->args)
+            {
+                auto id= static_cast<IdentifierNode*>(arg);
+                context->Define_local_Atribute(id->value.lexeme,id->getType());
+                if(currentType->exist_Argument(id->value.lexeme))
+                {
+                    std::string msg="The argument"+ node->parentName.lexeme+"  already exist";
+                    errorHandler.reportError(id->value,msg);
+                    return;
+                }
+                currentType->DefineArgument(id->value.lexeme,id->type);
+            }
+
             
             for(auto atribute : node->atributes)
             {
                 atribute->accept(*this);
+            };
+
+            for(auto atribute : node->atributes)
+            {
+                auto atr=static_cast<AtributeNode*>(atribute);
+                context->Define_local_Atribute(atr->id.lexeme,node->name.lexeme);
             };
 
 
@@ -61,22 +103,21 @@ class TypeCheckerVisitor:Visitor
             {
                 if(currentType->exist_Atribute(node->id.lexeme))
                 {
-                    std::string msg="The name"+ node->id.lexeme+" already exists in this type";
+                    std::string msg="The name "+ node->id.lexeme+" already exists in this type";
                     errorHandler.reportError(node->id,msg);
                     return;
                 }
 
-                     
-
+                
                 node->expression->accept(*this);
                 currentType->DefineAtribute(node->id.lexeme,node->expression->getType());   
-                 bool ok=context->Define_local_Atribute(node->id.lexeme,node->expression->getType());
-                if(!ok)
-                {
-                    std::string msg="The type"+ node->expression->getType()+" does not already exists";
-                    errorHandler.reportError(node->id,msg);
-                    return;   
-                }
+                // bool ok=context->Define_local_Atribute(node->id.lexeme,node->expression->getType());
+                // if(!ok)
+                // {
+                //     std::string msg="The type"+ node->expression->getType()+" does not already exists";
+                //     errorHandler.reportError(node->id,msg);
+                //     return;   
+                // }
 
                  return;
             }
@@ -93,7 +134,7 @@ class TypeCheckerVisitor:Visitor
             bool ok=context->Define_local_Atribute(node->id.lexeme,node->expression->getType());
             if(!ok)
             {
-                std::string msg="The type"+ node->expression->getType()+" does not already exists";
+                std::string msg="The type "+ node->expression->getType()+" does not already exists";
                 errorHandler.reportError(node->id,msg);
                 return;
             }
@@ -321,5 +362,48 @@ class TypeCheckerVisitor:Visitor
             node->setType(meth->getType());
         };
         void visit(DestructiveAssignNode* node) {}
+
+       
+        void visit(TypeInstantiation* node)
+        {
+            if(context->exist_Type(node->typeName.lexeme))
+            {
+                std::string msg="The class"+ node->typeName.lexeme+"  is not defined";
+                errorHandler.reportError(node->typeName,msg);
+                return;
+            }
+
+            Type* type= context->GetType(node->typeName.lexeme);
+            Type* parent=type->parent;
+        
+            size_t numberOfArgunmet=node->arguments.size();
+            Type* compare=type;
+            if(parent->name!="Object")
+                compare=type->parent;
+            
+            if(node->arguments.size()!=type->arguments.size())
+            {
+                std::string msg="Invalid number of arguments , must receive "+ type->arguments.size();
+                errorHandler.reportError(node->typeName,msg);
+                return;
+
+            }
+
+            for (size_t i = 0; i < node->arguments.size(); i++)
+            {
+                node->arguments[i]->accept(*this);
+                
+                
+                if(node->arguments[i]->getType()!=type->arguments[i].second->type)
+                {
+                    std::string msg="The type arguments does not match ";
+                    errorHandler.reportError(node->typeName,msg);
+                    return;
+                }
+
+            }
+
+        }    
+
 
 };

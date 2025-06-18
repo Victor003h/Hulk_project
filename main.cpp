@@ -1,35 +1,45 @@
+#include <iostream>
+#include <fstream>
+#include <sstream>
+#include <string>
 #include "./Parser/parser.cpp"
 #include "./Lexer/Lexer.cpp"
 #include "./Semantic/SemanticAnalizer.cpp"
 #include "./CodeGen/CodeGenerationContext.hpp"
-#include <iostream>
 
-// 329*2 
-// compute=200  // 395
-int main() {
-    std::string input=R"( 
-    type Point(x,y) {
-    x = x;
-    y = y;
 
-    getX() => 3;
-    getY() => 2;
+int main(int argc, char* argv[]) {
+    if (argc < 2) {
+        std::cerr << "Uso: " << argv[0] << " <archivo.hulk>" << std::endl;
+        return 1;
+    }
 
-    
-};
-    )";
+
+    // 1. Obtener el nombre del archivo .hulk desde la línea de comandos.
+    std::string filename = argv[1];
+
+    // 2. Abrir el archivo y leer su contenido en un std::string.
+    std::ifstream inputFile(filename);
+    if (!inputFile.is_open()) {
+        std::cerr << "Error al abrir el archivo: " << filename << std::endl;
+        return 1;
+    }
+
+    std::stringstream buffer;
+    buffer << inputFile.rdbuf();
+    std::string input = buffer.str();
+    inputFile.close();
+
     
     ErrorHandler error;
-
     Lexer lexer(error);
-  
     auto tokens=lexer.scanTokens(input);
     if(lexer.errorHandler.hasErrors())
-       {
-           return 0;
-        }
+    {
+        return 0;
+    }
 
-   // Grammar grammar =Grammar::loadGrammar("grammar.txt");
+
      Parser parser(error);
      auto cst= parser.parse(tokens);
      
@@ -39,12 +49,10 @@ int main() {
         return 0;
     }
 
-
     AstBuilderVisitor collector;
     AstNode* ast=cst->accept(collector);
 
     ast->print();
-
 
     SemanticAnalizer semantic;
     semantic.errorHandler=error;
@@ -52,7 +60,7 @@ int main() {
     semantic.check(ast);
     if(semantic.errorHandler.hasErrors())
     {
-      semantic.errorHandler.printErrors();
+      
       return 0;
     };
 
@@ -64,4 +72,6 @@ int main() {
     codegen.dumpIR();
     return 0;
 
+
+    return 0;
 }

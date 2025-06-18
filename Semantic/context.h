@@ -37,6 +37,7 @@ struct Type
 {
     std::string name;
     std::map<std::string,Atribute*> atributes;
+    std::vector<std::pair<std::string,Atribute*>>arguments;
     std::map<std::string,Method*> methods;
     Type* parent=nullptr;
 
@@ -50,9 +51,25 @@ struct Type
         atributes.emplace(name, new Atribute(name,type));
     }
 
+    void DefineArgument(std::string name,std::string type)
+    {
+        arguments.push_back({name, new Atribute(name,type)});
+    }
+
+
     bool exist_Atribute(std::string name)
     {
         return atributes.find(name)!=atributes.end();
+    }
+     bool exist_Argument(std::string name)
+    {
+        for(auto[argname,_] :arguments)
+        {
+
+            if(argname==name)   return true;
+
+        }
+        return false;
     }
 
 

@@ -82,8 +82,9 @@ class TypeBuilderVisitor :public Visitor
         void visit(LetExpression* node)       {};
         void visit(UnaryExpression* node)       {};
         void visit(FunCallNode* node)        {};
-          void visit(MemberCall* node)        {};
-          void visit(DestructiveAssignNode* node) {};
+        void visit(MemberCall* node)        {};
+        void visit(DestructiveAssignNode* node) {};
+        void visit(TypeInstantiation* node)    {}    ;
 
 
 };

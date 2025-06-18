@@ -47,5 +47,6 @@ class TypeCollectorVisitor: public Visitor
     void visit(FunCallNode* node)        {};
     void visit(MemberCall* node)        {};
     void visit(DestructiveAssignNode* node) {}
+    void visit(TypeInstantiation* node)    {}    ;
     
 };

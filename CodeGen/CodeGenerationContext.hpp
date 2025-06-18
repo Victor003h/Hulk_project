@@ -28,9 +28,8 @@ public:
 
     std::unordered_map<std::string, llvm::StructType*> namedTypes;
 
-    // Tabla de símbolos globales para variables (por ejemplo, "self") o constantes globales
-    std::unordered_map<std::string, llvm::Value*> globalVariables;
     
+      
     // Constructor: inicializa el IRBuilder y el módulo
     CodeGenerationContext()
         : irBuilder(llvmContext),
@@ -66,6 +65,22 @@ public:
     {
         llvm::IRBuilder<> tmpBuilder(&function->getEntryBlock(),function->getEntryBlock().begin());
         return tmpBuilder.CreateAlloca(type, nullptr, varName);
+    }
+
+    llvm::Type* getInteralType(std::string type)
+    {
+        if (type == "Number") 
+            return llvm::Type::getDoubleTy(llvmContext);
+        if (type == "String") 
+            return llvm::PointerType::get(llvm::Type::getInt8Ty(llvmContext), 0);
+        if (type == "Boolean") 
+            return llvm::Type::getInt1Ty(llvmContext);
+        if (type == "Object") 
+            return llvm::PointerType::get(llvm::Type::getInt8Ty(llvmContext), 0);
+        if (type == "Void" ) 
+            return llvm::Type::getVoidTy(llvmContext);
+
+        return llvm::PointerType::get(llvm::Type::getInt8Ty(llvmContext), 0);
     }
 
 
@@ -136,10 +151,9 @@ public:
     void visit(FunCallNode* node)            ;
     void visit(MemberCall* node)        ;
     void visit(DestructiveAssignNode* node)        ;
+    void visit(TypeInstantiation* node)        ;
 
 };
-
-
 
 void CodeGenerationContext::generateIR(AstNode* root)
 {
@@ -171,6 +185,7 @@ void CodeGenerationContext::generateIR(AstNode* root)
     llvm::BasicBlock* entry = llvm::BasicBlock::Create(llvmContext, "entry", mainFunc);
     irBuilder.SetInsertPoint(entry);
 
+    
     LlvmVisitor visitor(*this);
     visitor.currentFunction=mainFunc;
     root->accept(visitor);
@@ -221,55 +236,179 @@ void LlvmVisitor::visit(ProgramNode* node)
 
  };
 
-void LlvmVisitor::visit(TypeNode* node) 
-{
-    auto& ctx = cgContext;
+// void LlvmVisitor::visit(TypeNode* node) 
+// {
+//     auto& ctx = cgContext;
 
-    // 1. Crear estructura con atributos
+//     // 1. Crear estructura con atributos
+//     std::vector<llvm::Type*> memberTypes;
+//     for (auto* attr : node->atributes) {
+//         // Supongamos que todos los atributos son double
+//         memberTypes.push_back(llvm::Type::getDoubleTy(ctx.llvmContext));
+//     }
+
+//     llvm::StructType* classType = llvm::StructType::create(ctx.llvmContext, memberTypes, node->name.lexeme);
+//     ctx.namedTypes[node->name.lexeme] = classType;
+
+//     // 2. Crear función constructor
+//     std::vector<llvm::Type*> ctorArgs(memberTypes);
+//     llvm::FunctionType* ctorType = llvm::FunctionType::get(
+//         llvm::PointerType::getUnqual(classType), // return: pointer to struct
+//         ctorArgs,
+//         false
+//     );
+
+//     llvm::Function* ctorFunc = llvm::Function::Create(
+//         ctorType,
+//         llvm::Function::ExternalLinkage,
+//         node->name.lexeme + "_ctor",
+//         ctx.llvmModule
+//     );
+
+//     llvm::BasicBlock* entry = llvm::BasicBlock::Create(ctx.llvmContext, "entry", ctorFunc);
+//     ctx.irBuilder.SetInsertPoint(entry);
+
+//     llvm::Value* self = ctx.irBuilder.CreateAlloca(classType, nullptr, "self");
+
+//     int index = 0;
+//     for (llvm::Argument& arg : ctorFunc->args()) {
+//         arg.setName("arg" + std::to_string(index));
+//         llvm::Value* fieldPtr = ctx.irBuilder.CreateStructGEP(classType, self, index, "ptr");
+//         ctx.irBuilder.CreateStore(&arg, fieldPtr);
+//         ++index;
+//     }
+
+//     ctx.irBuilder.CreateRet(self);
+
+//     // 3. Visitar los métodos (cada uno se convierte en función)
+//     for (auto* method : node->methods) {
+//         method->accept(*this);  // Delegamos a visit(FunctionNode*)
+//     }
+// }
+
+void LlvmVisitor::visit(TypeNode* node) {
+    // 1. Preparar vectores para los miembros (atributos) de la clase.
     std::vector<llvm::Type*> memberTypes;
-    for (auto* attr : node->atributes) {
-        // Supongamos que todos los atributos son double
-        memberTypes.push_back(llvm::Type::getDoubleTy(ctx.llvmContext));
+    std::vector<std::string> memberNames;
+
+    // Recorrer los atributos definidos en la clase.
+    // Se asume que cada nodo de atributo puede proporcionar su tipo (por ejemplo, mediante getTypeString())
+    // y su nombre (por ejemplo, mediante getToken().lexeme). Si no se especifica un tipo, se usa "Number" por defecto.
+    for (AstNode* attr : node->atributes) {
+        std::string attrTypeName = "Number";
+
+        // Suponemos que el nodo atributo conoce su tipo.
+        if (/* attr tiene definido un tipo */ false) {
+            // attr->getTypeString() es un método hipotético para extraer el tipo.
+            attrTypeName = static_cast<AtributeNode*>(attr)->getType();
+        }
+        llvm::Type* attrType = cgContext.getInteralType(attrTypeName);
+        memberTypes.push_back(attrType);
+        // Suponemos que el atributo posee un token con el nombre
+        memberNames.push_back(static_cast<AtributeNode*>(attr)->id.lexeme);
     }
 
-    llvm::StructType* classType = llvm::StructType::create(ctx.llvmContext, memberTypes, node->name.lexeme);
-    ctx.namedTypes[node->name.lexeme] = classType;
+    // Si no se encontraron atributos, para evitar la creación de un struct vacío usamos un tipo dummy.
+    if (memberTypes.empty()) {
+        memberTypes.push_back(llvm::Type::getInt8Ty(cgContext.llvmContext));
+    }
 
-    // 2. Crear función constructor
-    std::vector<llvm::Type*> ctorArgs(memberTypes);
-    llvm::FunctionType* ctorType = llvm::FunctionType::get(
-        llvm::PointerType::getUnqual(classType), // return: pointer to struct
-        ctorArgs,
+    // 2. Crear el tipo de estructura LLVM que representará la clase.
+    llvm::StructType* structType = llvm::StructType::create(cgContext.llvmContext, memberTypes, node->name.lexeme);
+    // Guardamos el struct para referenciarlo en otros lugares (por ejemplo, en la generación de métodos).
+    cgContext.namedTypes[node->name.lexeme] = structType;
+
+    // 3. Procesar los métodos de la clase.
+    // Para cada método definido, se renombra agregándole el nombre de la clase (para evitar colisiones)
+    // y se asegura que el primero de sus parámetros sea "self".
+    for (AstNode* method : node->methods) {
+        if (auto defFunc = dynamic_cast<MethodNode*>(method)) {
+            std::string originalName = defFunc->id.lexeme;
+            defFunc->id.lexeme = node->name.lexeme + "_" + originalName;
+
+            bool hasSelfParam = false;
+            for (const auto& param : defFunc->params) 
+            {
+                auto iden=dynamic_cast<IdentifierNode*>(method);
+                if (iden->value.lexeme == "self") {
+                    hasSelfParam = true;
+                    break;
+                }
+            }
+            if (!hasSelfParam) {
+                auto selfP=new IdentifierNode(Token("self",TokenType::Identifier,0,0));
+                defFunc->params.insert(defFunc->params.begin(),selfP);
+            }
+
+            defFunc->accept(*this);
+
+        }
+    }
+
+    // 4. Recoger los argumentos para el constructor de la clase.
+    // Los argumentos se definen en node->args y corresponden a las entradas para inicializar los atributos.
+    std::vector<llvm::Type*> constructorParamTypes;
+    for (AstNode* arg : node->args) {
+        std::string argTypeName = arg->getType();
+        
+        llvm::Type* argType = cgContext.namedTypes[argTypeName];
+        constructorParamTypes.push_back(argType);
+    }
+
+    // 5. Crear la función constructor.
+    // El constructor se llamará "new_<NombreDeLaClase>" y retornará un puntero a la estructura (instancia de la clase).
+    std::string constructorName = "new_" + node->name.lexeme;
+    llvm::FunctionType* constructorType = llvm::FunctionType::get(
+        llvm::PointerType::get(structType, 0),
+        constructorParamTypes,
         false
     );
-
-    llvm::Function* ctorFunc = llvm::Function::Create(
-        ctorType,
+    llvm::Function* constructorFunc = llvm::Function::Create(
+        constructorType,
         llvm::Function::ExternalLinkage,
-        node->name.lexeme + "_ctor",
-        ctx.llvmModule
+        constructorName,
+        cgContext.llvmModule
     );
 
-    llvm::BasicBlock* entry = llvm::BasicBlock::Create(ctx.llvmContext, "entry", ctorFunc);
-    ctx.irBuilder.SetInsertPoint(entry);
+    // 6. Construir el cuerpo del constructor.
+    llvm::BasicBlock* constructorBB = llvm::BasicBlock::Create(cgContext.llvmContext, "entry", constructorFunc);
+    llvm::IRBuilder<> constructorBuilder(constructorBB);
 
-    llvm::Value* self = ctx.irBuilder.CreateAlloca(classType, nullptr, "self");
+    // Reservar memoria para la instancia usando malloc.
+    llvm::Value* structSize = llvm::ConstantExpr::getSizeOf(structType);
+    llvm::Function* mallocFunc = cgContext.llvmModule.getFunction("malloc");
+    if (!mallocFunc) {
+        llvm::FunctionType* mallocType = llvm::FunctionType::get(
+            llvm::PointerType::get(llvm::Type::getInt8Ty(cgContext.llvmContext), 0),
+            { llvm::Type::getInt64Ty(cgContext.llvmContext) },
+            false
+        );
+        mallocFunc = llvm::Function::Create(mallocType, llvm::Function::ExternalLinkage, "malloc", cgContext.llvmModule);
+    }
+    llvm::Value* rawPtr = constructorBuilder.CreateCall(mallocFunc, { structSize });
+    llvm::Value* typedPtr = constructorBuilder.CreateBitCast(rawPtr, llvm::PointerType::get(structType, 0));
 
-    int index = 0;
-    for (llvm::Argument& arg : ctorFunc->args()) {
-        arg.setName("arg" + std::to_string(index));
-        llvm::Value* fieldPtr = ctx.irBuilder.CreateStructGEP(classType, self, index, "ptr");
-        ctx.irBuilder.CreateStore(&arg, fieldPtr);
-        ++index;
+    // 7. Inicializar los atributos de la instancia.
+    // Se asume que, de haber argumentos para el constructor, estos corresponden a la inicialización de los atributos,
+    // en el mismo orden en que se definieron.
+    auto argIt = constructorFunc->arg_begin();
+    unsigned memberIndex = 0;
+    for (AstNode* attr : node->atributes) {
+        llvm::Value* memberPtr = constructorBuilder.CreateStructGEP(structType, typedPtr, memberIndex);
+        auto atr=static_cast<AtributeNode*>(attr);
+        atr->accept(*this);
+        
+        llvm::Value* initValue = lastValue;
+        
+        constructorBuilder.CreateStore(initValue, memberPtr);
+        ++memberIndex;
     }
 
-    ctx.irBuilder.CreateRet(self);
-
-    // 3. Visitar los métodos (cada uno se convierte en función)
-    for (auto* method : node->methods) {
-        method->accept(*this);  // Delegamos a visit(FunctionNode*)
-    }
+    // 8. Finalizar el constructor, retornando un puntero a la nueva instancia.
+    constructorBuilder.CreateRet(typedPtr);
+    lastValue = nullptr;
 }
+
 
 void LlvmVisitor::visit(BlockNode* node) 
 {
@@ -373,7 +512,7 @@ void LlvmVisitor::visit(IdentifierNode* node)
 };
 
 
-void LlvmVisitor::visit(AtributeNode* node)          {};
+
 
 void LlvmVisitor::visit(MethodNode* node) 
 {
@@ -653,7 +792,7 @@ void LlvmVisitor::visit(WhileExpression* node)
     
 };
 
-void LlvmVisitor::visit(ForExression* node)          {};
+
 
 void LlvmVisitor::visit(LetExpression* node)      
 {
@@ -681,7 +820,7 @@ void LlvmVisitor::visit(LetExpression* node)
 
 };
 
-void LlvmVisitor::visit(UnaryExpression* node)       {}; 
+ 
 
 void LlvmVisitor::visit(FunCallNode* node) {
     // Buscar la función por su nombre
@@ -720,7 +859,15 @@ void LlvmVisitor::visit(FunCallNode* node) {
 }
 
 
-void LlvmVisitor::visit(MemberCall* node)        {};
+void LlvmVisitor::visit(MemberCall* node) 
+{
+    auto objtype=cgContext.namedTypes[node->obj->getType()];
+    auto meth=dynamic_cast<MethodNode*>(node->member);
+    meth->id.lexeme=meth->id.lexeme+"_"+node->obj->getType();
+
+    meth->accept(*this);
+
+};
 
 void LlvmVisitor::visit(LiteralNode* node)
 {
@@ -744,6 +891,35 @@ void LlvmVisitor::visit(LiteralNode* node)
     }
 
 
+}
+
+void LlvmVisitor::visit(TypeInstantiation* node) {
+    // Construir el nombre del constructor a llamar, por ejemplo "new_Object" si el token es "Object"
+    std::string constructorName = "new_" + node->typeName.lexeme;
+    llvm::Function* constructorFunc = cgContext.llvmModule.getFunction(constructorName);
+    if (!constructorFunc) {
+        std::cerr << "Error: constructor '" << constructorName << "' no definido.\n";
+        lastValue = nullptr;
+        return;
+    }
+    
+    // Evaluar los argumentos de la instanciación y recolectarlos en un vector.
+    std::vector<llvm::Value*> args;
+    for (AstNode* arg : node->arguments) {
+        arg->accept(*this);  // Se espera que lastValue se actualice con el valor del argumento
+        if (!lastValue) {
+            std::cerr << "Error: argumento inválido en instanciación.\n";
+            lastValue = nullptr;
+            return;
+        }
+        args.push_back(lastValue);
+    }
+    
+    // Generar la llamada al constructor. Se obtiene un pointer al objeto instanciado.
+    llvm::Value* obj = cgContext.irBuilder.CreateCall(constructorFunc, args, "instCall");
+    
+    // El valor resultante se guarda para continuar la generación del código.
+    lastValue = obj;
 }
 
 
@@ -776,3 +952,8 @@ void LlvmVisitor::visit(DestructiveAssignNode* node)
     lastValue=right;
     
 }
+
+void LlvmVisitor::visit(AtributeNode* node) {};
+void LlvmVisitor::visit(UnaryExpression* node)       {};
+void LlvmVisitor::visit(ForExression* node)          {};
+

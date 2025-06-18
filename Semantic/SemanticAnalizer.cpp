@@ -31,9 +31,9 @@ public:
         if(def.errorHandler.hasErrors())
         {
             def.errorHandler.printErrors();
+            errorHandler=def.errorHandler;
             return;
         }
-
 
     }
 
