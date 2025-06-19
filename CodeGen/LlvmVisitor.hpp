@@ -1,32 +1,37 @@
-// #include "../Parser/AstNodes.h"
-// #include "llvm/IR/Value.h"
-// #include "CodeGenerationContext.hpp"
+#include "../Parser/AstNodes.h"
+#include "llvm/IR/Value.h"
+#include "CodeGenerationContext.hpp"
 
 
 
-// class LlvmVisitor:public Visitor
-// {
-// public:
-//     CodeGenerationContext &cgContext;
-//     llvm::Value* lastValue;
 
-//     LlvmVisitor(CodeGenerationContext &cgContext)
-//     : cgContext(cgContext),lastValue(nullptr){}
+class LlvmVisitor:public Visitor
+{
+public:
+    CodeGenerationContext &cgContext;
+    llvm::Value* lastValue;
+    llvm::Function* currentFunction;
 
-//     void visit(ProgramNode* node)     ;
-//     void visit(TypeNode* node)            ;
-//     void visit(BlockNode* node)            ;
+    LlvmVisitor(CodeGenerationContext &cgContext)
+    : cgContext(cgContext),lastValue(nullptr){}
 
-//     void visit(BinaryExpression* node)     ;
-//     void visit(LiteralNode* node)          ;
-//     void visit(IdentifierNode* node)    ;
-//     void visit(AtributeNode* node)          ;
-//     void visit(MethodNode* node)        ;
-//     void visit(IfExpression* node)          ;
-//     void visit(WhileExpression* node)       ;
-//     void visit(ForExression* node)          ;
-//     void visit(LetExpression* node)         ;
-//     void visit(UnaryExpression* node)       ;    
+    void visit(ProgramNode* node)     ;
+    void visit(TypeNode* node)            ;
+    void visit(BlockNode* node)            ;
 
+    void visit(BinaryExpression* node)     ;
+    void visit(LiteralNode* node)          ;
+    void visit(IdentifierNode* node)    ;
+    void visit(AtributeNode* node)          ;
+    void visit(MethodNode* node)        ;
+    void visit(IfExpression* node)          ;
+    void visit(WhileExpression* node)       ;
+    void visit(ForExression* node)          ;
+    void visit(LetExpression* node)         ;
+    void visit(UnaryExpression* node)       ;    
+    void visit(FunCallNode* node)            ;
+    void visit(MemberCall* node)        ;
+    void visit(DestructiveAssignNode* node)        ;
+    void visit(TypeInstantiation* node)        ;
 
-// };
+};

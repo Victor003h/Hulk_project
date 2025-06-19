@@ -1,1 +1,19 @@
-let x:Number = 2 in x+1;
+type Engine {
+    power: Number = 150.0;
+    getPower() => self.power;
+};
+
+type Car {
+    engine: Engine = new Engine();
+  
+    enginePower() => self.engine.getPower();
+};
+
+type Driver {
+    car: Car = new Car();
+
+    maxSpeed() => self.car.enginePower();
+};
+
+let d: Driver = new Driver()
+    in d.maxSpeed();

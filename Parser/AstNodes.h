@@ -114,7 +114,6 @@ public:
 class AtributeNode : public AstNode {
 public:
     Token id;
-    std::string type="Object";
     AstNode* expression;
 
     AtributeNode(Token id, AstNode* expression)
@@ -139,7 +138,6 @@ public:
     Token id;
     std::vector<AstNode*> params;
     AstNode* body;
-    std::string type="Object";
     
     MethodNode(Token id, std::vector<AstNode*> params, AstNode* body)
         : id(id), params(params), body(body) {}
@@ -215,7 +213,6 @@ public:
     AstNode* left;
     Token op;
     AstNode* right;
-    std::string type="Object";
 
     BinaryExpression(AstNode* left, Token op, AstNode* right)
         : left(left), op(op), right(right) {}
@@ -259,8 +256,7 @@ public:
 class IdentifierNode : public Expression {
 public:
     Token value;
-    std::string type="Object";
-
+    
     IdentifierNode(Token value)
         : value(value) {}
 
@@ -280,7 +276,7 @@ class IfExpression : public AstNode {
 public:
     AstNode* defaultExp;
     std::vector<std::pair<AstNode*, AstNode*>> exprs_cond;
-    std::string type="Object";
+ 
 
     IfExpression(AstNode* defaultExp, std::vector<std::pair<AstNode*, AstNode*>> exprs_cond)
         : defaultExp(defaultExp), exprs_cond(exprs_cond) {}
@@ -309,7 +305,7 @@ class WhileExpression : public AstNode {
 public:
     AstNode* condition;
     AstNode* body;
-    std::string type="Object";
+  
 
     WhileExpression(AstNode* condition, AstNode* body)
         : condition(condition), body(body) {}
@@ -335,8 +331,7 @@ public:
     AstNode* item;
     AstNode* iterable;
     AstNode* body;
-    std::string type="Object";
-
+   
     ForExression(AstNode* item, AstNode* iterable, AstNode* body)
         : item(item), iterable(iterable), body(body) {}
 
@@ -362,7 +357,7 @@ class LetExpression : public Expression {
 public:
     std::vector<AstNode*> assignments;
     AstNode* body;
-    std::string type="Object";
+  
 
     LetExpression(const std::vector<AstNode*>& assignments, AstNode* body)
         : assignments(assignments), body(body) {}
@@ -392,7 +387,6 @@ class UnaryExpression :public Expression
     public:
     Token value;
     AstNode* exp;
-    std::string type="Object";
 
         UnaryExpression(Token value,AstNode* exp)
         : value(value),exp(exp){}
@@ -420,8 +414,7 @@ class FunCallNode : public Expression {
 public:
     Token id; 
     std::vector<AstNode*> arguments; 
-    std::string type = "Object"; 
-
+  
     FunCallNode(const Token& id, const std::vector<AstNode*>& arguments)
         : id(id), arguments(arguments) {}
 
@@ -451,7 +444,6 @@ class MemberCall:public AstNode
     public:
     AstNode* obj;
     AstNode* member;
-    std::string type;
 
     MemberCall(AstNode* obj,AstNode* member)
     : obj(obj),member(member)
@@ -485,7 +477,7 @@ public:
     Token op_des;
     AstNode* rhs;  // Lo que está a la derecha de :=
 
-    std::string type = "Object";
+ 
 
     DestructiveAssignNode(AstNode* lhs,Token op, AstNode* rhs)
         : lhs(lhs),op_des(op), rhs(rhs) {}
@@ -514,7 +506,7 @@ class TypeInstantiation:public AstNode
     public:
     Token typeName; 
     std::vector<AstNode*> arguments; 
-    std::string type = "Object"; 
+   
 
     TypeInstantiation(const Token& id, const std::vector<AstNode*>& arguments)
         : typeName(id), arguments(arguments) {type=id.lexeme;}

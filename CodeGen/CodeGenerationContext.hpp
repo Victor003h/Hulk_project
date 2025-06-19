@@ -26,8 +26,11 @@ public:
     llvm::IRBuilder<> irBuilder;                 // Constructor para crear instrucciones IR
     llvm::Module llvmModule;                     // Módulo IR de LLVM (una unidad de compilación)
 
-    std::unordered_map<std::string, llvm::StructType*> namedTypes;
+    std::unordered_map<std::string, llvm::StructType*> namedStruct;
+    std::unordered_map<std::string, TypeNode*> namedTypeNode;
+    std::unordered_map<std::string, std::vector<std::string>> classMemberNames;
 
+    std::string currentType;
     
       
     // Constructor: inicializa el IRBuilder y el módulo
@@ -39,20 +42,22 @@ public:
     void generateIR(AstNode*root);
     // Vuelca el IR a un archivo (por defecto "hulk-low-code.ll")
    
-    void dumpIR(const std::string& filename = "hulk-low-code.ll");
+    void dumpIR(const std::string& filename = "output.ll");
+
+    
 
     // Manejo de ámbitos (scopes) para variables locales y declaraciones de funciones
-    std::vector<std::unordered_map<std::string, llvm::Value*>> variableScopes;
+    std::vector<std::unordered_map<std::string, llvm::AllocaInst*>> variableScopes;
     std::vector<std::unordered_map<std::string, MethodNode*>> functionScopes;
 
     // Manejo de ámbitos para variables
     inline void pushLocalScope() { variableScopes.emplace_back(); }
     inline void popLocalScope()  { if (!variableScopes.empty()) variableScopes.pop_back(); }
-    inline void addLocalVariable(const std::string& name, llvm::Value* value) {
+    inline void addLocalVariable(const std::string& name, llvm::AllocaInst* value) {
         if (!variableScopes.empty())
             variableScopes.back()[name] = value;
     }
-    llvm::Value* getLocalVariable(const std::string& name) const {
+    llvm::AllocaInst* getLocalVariable(const std::string& name) const {
         for (auto it = variableScopes.rbegin(); it != variableScopes.rend(); ++it) {
             auto found = it->find(name);
             if (found != it->end())
@@ -67,6 +72,7 @@ public:
         return tmpBuilder.CreateAlloca(type, nullptr, varName);
     }
 
+
     llvm::Type* getInteralType(std::string type)
     {
         if (type == "Number") 
@@ -80,9 +86,19 @@ public:
         if (type == "Void" ) 
             return llvm::Type::getVoidTy(llvmContext);
 
-        return llvm::PointerType::get(llvm::Type::getInt8Ty(llvmContext), 0);
+        return nullptr;
     }
 
+    int GetIndexOfMember(TypeNode*node,std::string member)
+    {
+        for (size_t i = 0; i < node->atributes.size(); i++)
+        {
+            auto attr= static_cast<AtributeNode*>(node->atributes[i]);
+            if(attr->id.lexeme==member) return i;
+        }
+        
+        return -1;
+    }
 
     //Manejo de ámbitos para declaraciones de funciones
     inline void pushFunctionScope() { functionScopes.emplace_back(); }
@@ -216,7 +232,7 @@ void CodeGenerationContext::generateIR(AstNode* root)
 
 void CodeGenerationContext::dumpIR(const std::string &filename) {
         std::error_code EC;
-        llvm::raw_fd_ostream out("hulk/hulk.ll", EC, llvm::sys::fs::OF_Text);
+        llvm::raw_fd_ostream out("hulk/"+filename, EC, llvm::sys::fs::OF_Text);
         if (EC) {
             llvm::errs() << "Error al abrir el archivo: " << EC.message();
             return;
@@ -236,131 +252,59 @@ void LlvmVisitor::visit(ProgramNode* node)
 
  };
 
-// void LlvmVisitor::visit(TypeNode* node) 
-// {
-//     auto& ctx = cgContext;
-
-//     // 1. Crear estructura con atributos
-//     std::vector<llvm::Type*> memberTypes;
-//     for (auto* attr : node->atributes) {
-//         // Supongamos que todos los atributos son double
-//         memberTypes.push_back(llvm::Type::getDoubleTy(ctx.llvmContext));
-//     }
-
-//     llvm::StructType* classType = llvm::StructType::create(ctx.llvmContext, memberTypes, node->name.lexeme);
-//     ctx.namedTypes[node->name.lexeme] = classType;
-
-//     // 2. Crear función constructor
-//     std::vector<llvm::Type*> ctorArgs(memberTypes);
-//     llvm::FunctionType* ctorType = llvm::FunctionType::get(
-//         llvm::PointerType::getUnqual(classType), // return: pointer to struct
-//         ctorArgs,
-//         false
-//     );
-
-//     llvm::Function* ctorFunc = llvm::Function::Create(
-//         ctorType,
-//         llvm::Function::ExternalLinkage,
-//         node->name.lexeme + "_ctor",
-//         ctx.llvmModule
-//     );
-
-//     llvm::BasicBlock* entry = llvm::BasicBlock::Create(ctx.llvmContext, "entry", ctorFunc);
-//     ctx.irBuilder.SetInsertPoint(entry);
-
-//     llvm::Value* self = ctx.irBuilder.CreateAlloca(classType, nullptr, "self");
-
-//     int index = 0;
-//     for (llvm::Argument& arg : ctorFunc->args()) {
-//         arg.setName("arg" + std::to_string(index));
-//         llvm::Value* fieldPtr = ctx.irBuilder.CreateStructGEP(classType, self, index, "ptr");
-//         ctx.irBuilder.CreateStore(&arg, fieldPtr);
-//         ++index;
-//     }
-
-//     ctx.irBuilder.CreateRet(self);
-
-//     // 3. Visitar los métodos (cada uno se convierte en función)
-//     for (auto* method : node->methods) {
-//         method->accept(*this);  // Delegamos a visit(FunctionNode*)
-//     }
-// }
 
 void LlvmVisitor::visit(TypeNode* node) {
-    // 1. Preparar vectores para los miembros (atributos) de la clase.
-    std::vector<llvm::Type*> memberTypes;
-    std::vector<std::string> memberNames;
 
-    // Recorrer los atributos definidos en la clase.
-    // Se asume que cada nodo de atributo puede proporcionar su tipo (por ejemplo, mediante getTypeString())
-    // y su nombre (por ejemplo, mediante getToken().lexeme). Si no se especifica un tipo, se usa "Number" por defecto.
+   
+    std::vector<std::string> attrNames;
+    std::vector<llvm::Type*> attrTypes;
+   
     for (AstNode* attr : node->atributes) {
-        std::string attrTypeName = "Number";
+        std::string attrTypeName = attr->getType();
 
-        // Suponemos que el nodo atributo conoce su tipo.
-        if (/* attr tiene definido un tipo */ false) {
-            // attr->getTypeString() es un método hipotético para extraer el tipo.
-            attrTypeName = static_cast<AtributeNode*>(attr)->getType();
+        
+        if ( cgContext.getInteralType(attrTypeName)) {
+            llvm::Type* type = cgContext.getInteralType(attrTypeName);
+            attrTypes.push_back(type);
+            attrNames.push_back(static_cast<AtributeNode*>(attr)->id.lexeme);
+           
         }
-        llvm::Type* attrType = cgContext.getInteralType(attrTypeName);
-        memberTypes.push_back(attrType);
-        // Suponemos que el atributo posee un token con el nombre
-        memberNames.push_back(static_cast<AtributeNode*>(attr)->id.lexeme);
-    }
-
-    // Si no se encontraron atributos, para evitar la creación de un struct vacío usamos un tipo dummy.
-    if (memberTypes.empty()) {
-        memberTypes.push_back(llvm::Type::getInt8Ty(cgContext.llvmContext));
-    }
-
-    // 2. Crear el tipo de estructura LLVM que representará la clase.
-    llvm::StructType* structType = llvm::StructType::create(cgContext.llvmContext, memberTypes, node->name.lexeme);
-    // Guardamos el struct para referenciarlo en otros lugares (por ejemplo, en la generación de métodos).
-    cgContext.namedTypes[node->name.lexeme] = structType;
-
-    // 3. Procesar los métodos de la clase.
-    // Para cada método definido, se renombra agregándole el nombre de la clase (para evitar colisiones)
-    // y se asegura que el primero de sus parámetros sea "self".
-    for (AstNode* method : node->methods) {
-        if (auto defFunc = dynamic_cast<MethodNode*>(method)) {
-            std::string originalName = defFunc->id.lexeme;
-            defFunc->id.lexeme = node->name.lexeme + "_" + originalName;
-
-            bool hasSelfParam = false;
-            for (const auto& param : defFunc->params) 
-            {
-                auto iden=dynamic_cast<IdentifierNode*>(method);
-                if (iden->value.lexeme == "self") {
-                    hasSelfParam = true;
-                    break;
-                }
-            }
-            if (!hasSelfParam) {
-                auto selfP=new IdentifierNode(Token("self",TokenType::Identifier,0,0));
-                defFunc->params.insert(defFunc->params.begin(),selfP);
-            }
-
-            defFunc->accept(*this);
-
+        else
+        {
+            llvm::Type* type = cgContext.namedStruct[attrTypeName];
+            attrTypes.push_back(type);
+            attrNames.push_back(static_cast<AtributeNode*>(attr)->id.lexeme);
+        
         }
+    
     }
+ 
+    if (attrTypes.empty()) 
+    {
+        attrTypes.push_back(llvm::Type::getInt8Ty(cgContext.llvmContext));
+    }
+    cgContext.classMemberNames[node->name.lexeme]=attrNames;
 
-    // 4. Recoger los argumentos para el constructor de la clase.
-    // Los argumentos se definen en node->args y corresponden a las entradas para inicializar los atributos.
-    std::vector<llvm::Type*> constructorParamTypes;
+   
+
+    llvm::StructType* structType = llvm::StructType::create(cgContext.llvmContext, attrTypes, node->name.lexeme);
+    cgContext.namedStruct[node->name.lexeme] = structType;
+    cgContext.namedTypeNode[node->name.lexeme]=node;
+    
+    auto lasttype=cgContext.currentType;
+    cgContext.currentType=node->name.lexeme;
+
+    std::vector<llvm::Type*> ParamTypes;
+
     for (AstNode* arg : node->args) {
         std::string argTypeName = arg->getType();
-        
-        llvm::Type* argType = cgContext.namedTypes[argTypeName];
-        constructorParamTypes.push_back(argType);
+        ParamTypes.push_back(cgContext.namedStruct[argTypeName]);
     }
 
-    // 5. Crear la función constructor.
-    // El constructor se llamará "new_<NombreDeLaClase>" y retornará un puntero a la estructura (instancia de la clase).
     std::string constructorName = "new_" + node->name.lexeme;
     llvm::FunctionType* constructorType = llvm::FunctionType::get(
         llvm::PointerType::get(structType, 0),
-        constructorParamTypes,
+        ParamTypes,
         false
     );
     llvm::Function* constructorFunc = llvm::Function::Create(
@@ -374,38 +318,82 @@ void LlvmVisitor::visit(TypeNode* node) {
     llvm::BasicBlock* constructorBB = llvm::BasicBlock::Create(cgContext.llvmContext, "entry", constructorFunc);
     llvm::IRBuilder<> constructorBuilder(constructorBB);
 
-    // Reservar memoria para la instancia usando malloc.
+    cgContext.pushLocalScope();
+    unsigned argIndex = 0;
+    for (auto& arg : constructorFunc->args()) {
+        arg.setName(dynamic_cast<IdentifierNode*>(node->args[argIndex])->value.lexeme);
+
+        llvm::AllocaInst* alloca = cgContext.createEntryBlockAlloca(constructorFunc, arg.getType(), arg.getName().str());
+        constructorBuilder.CreateStore(&arg, alloca);
+        cgContext.addLocalVariable(arg.getName().str(), alloca);
+        ++argIndex;
+    }
+
     llvm::Value* structSize = llvm::ConstantExpr::getSizeOf(structType);
-    llvm::Function* mallocFunc = cgContext.llvmModule.getFunction("malloc");
+    llvm::Function* mallocFunc = cgContext.llvmModule.getFunction("malloc");  // todo:que es
+
     if (!mallocFunc) {
-        llvm::FunctionType* mallocType = llvm::FunctionType::get(
-            llvm::PointerType::get(llvm::Type::getInt8Ty(cgContext.llvmContext), 0),
+        llvm::FunctionType* mallocType = llvm::FunctionType::get(llvm::PointerType::get(llvm::Type::getInt8Ty(cgContext.llvmContext), 0),
             { llvm::Type::getInt64Ty(cgContext.llvmContext) },
             false
         );
         mallocFunc = llvm::Function::Create(mallocType, llvm::Function::ExternalLinkage, "malloc", cgContext.llvmModule);
     }
-    llvm::Value* rawPtr = constructorBuilder.CreateCall(mallocFunc, { structSize });
-    llvm::Value* typedPtr = constructorBuilder.CreateBitCast(rawPtr, llvm::PointerType::get(structType, 0));
+    
+    llvm::Value* rawPtr = constructorBuilder.CreateCall(mallocFunc, { structSize });  //todo: que es 
+    llvm::Value* typedPtr = constructorBuilder.CreateBitCast(rawPtr, llvm::PointerType::get(structType, 0));    //todo: que es
 
-    // 7. Inicializar los atributos de la instancia.
-    // Se asume que, de haber argumentos para el constructor, estos corresponden a la inicialización de los atributos,
-    // en el mismo orden en que se definieron.
-    auto argIt = constructorFunc->arg_begin();
+  //  llvm::AllocaInst* selfAlloca = cgContext.createEntryBlockAlloca(constructorFunc, typedPtr->getType(), "self");
+  //  constructorBuilder.CreateStore(typedPtr, selfAlloca);
+  //  cgContext.addLocalVariable("self", selfAlloca);
+
     unsigned memberIndex = 0;
-    for (AstNode* attr : node->atributes) {
-        llvm::Value* memberPtr = constructorBuilder.CreateStructGEP(structType, typedPtr, memberIndex);
+    lastValue = nullptr;
+
+    auto prevInsertPoint = cgContext.irBuilder.GetInsertBlock();
+    cgContext.irBuilder.SetInsertPoint(constructorBB);
+
+    for (AstNode* attr : node->atributes) 
+    {
         auto atr=static_cast<AtributeNode*>(attr);
-        atr->accept(*this);
+        
+        attr->accept(*this);  
         
         llvm::Value* initValue = lastValue;
-        
-        constructorBuilder.CreateStore(initValue, memberPtr);
+        if (!initValue) {
+            std::cerr << "Error: atributo sin valor de inicialización.\n";
+            initValue = llvm::ConstantFP::get(cgContext.llvmContext, llvm::APFloat(0.0));
+        }
+
+        llvm::Value* memberPtr =constructorBuilder.CreateStructGEP(structType,typedPtr,memberIndex,atr->id.lexeme);
+        constructorBuilder.CreateStore(initValue,memberPtr);
+
+       
         ++memberIndex;
     }
+    cgContext.irBuilder.SetInsertPoint(prevInsertPoint);
 
-    // 8. Finalizar el constructor, retornando un puntero a la nueva instancia.
     constructorBuilder.CreateRet(typedPtr);
+     
+
+    for (AstNode* method : node->methods) {
+        if (auto methodNode = dynamic_cast<MethodNode*>(method)) {
+            std::string methName = methodNode->id.lexeme;
+            methodNode->id.lexeme =  methName+ "_" + node->name.lexeme   ;
+
+           
+            auto selfP=new IdentifierNode(Token("self",TokenType::Identifier,0,0));
+            methodNode->params.insert(methodNode->params.begin(),selfP);
+            
+
+            methodNode->accept(*this);
+
+        }
+    }
+
+    cgContext.popLocalScope(); 
+    cgContext.namedStruct[node->name.lexeme]=structType;
+    cgContext.currentType=lasttype;
     lastValue = nullptr;
 }
 
@@ -496,7 +484,7 @@ void LlvmVisitor::visit(BinaryExpression* node)
 
 void LlvmVisitor::visit(IdentifierNode* node) 
 {
-
+    
     llvm::Value* varAlloca=cgContext.getLocalVariable(node->value.lexeme);
     if(!varAlloca)
     {
@@ -504,53 +492,78 @@ void LlvmVisitor::visit(IdentifierNode* node)
     }
 
     llvm::Type* varType = llvm::cast<llvm::AllocaInst>(varAlloca)->getAllocatedType();
-     
-    llvm::Value* value = cgContext.irBuilder.CreateLoad(varType, varAlloca, node->value.lexeme);
-    lastValue = value;
     
-
+    lastValue = cgContext.irBuilder.CreateLoad(varType, varAlloca, node->value.lexeme);
+    return;
+    
+          
 };
-
-
 
 
 void LlvmVisitor::visit(MethodNode* node) 
 {
     llvm::BasicBlock* prevBlock = cgContext.irBuilder.GetInsertBlock();
 
-    std::vector<llvm::Type*> paramTypes(node->params.size(), llvm::Type::getDoubleTy(cgContext.llvmContext)); // Usamos double por defecto
+    std::vector<llvm::Type*> paramTypes;
+    std::vector<std::string> paramNames;
+    for (auto* paramNode : node->params) 
+    {
+        auto id=static_cast<IdentifierNode*>(paramNode);
+        std::string typeStr = paramNode->getType();
+        llvm::Type* paramType = nullptr;
 
-    llvm::FunctionType* funcType = llvm::FunctionType::get(
-        llvm::Type::getDoubleTy(cgContext.llvmContext), // tipo de retorno
+        if(id->value.lexeme=="self" && !cgContext.currentType.empty())
+        {
+            auto selfType=cgContext.namedStruct[cgContext.currentType];
+            paramType=llvm::PointerType::get(selfType,0);
+        }
+        
+        else if(cgContext.getInteralType(typeStr))
+            paramType=cgContext.getInteralType(typeStr);
+        else
+        {
+            paramType=cgContext.namedStruct[typeStr];
+        }
+
+        paramTypes.push_back(paramType);
+        paramNames.push_back(id->value.lexeme);
+    }
+
+
+    llvm::FunctionType* functionType = llvm::FunctionType::get(
+        llvm::Type::getDoubleTy(cgContext.llvmContext), // tipo de retorno por ahora es double ,cambiar
         paramTypes,
         false
     );
 
     llvm::Function* function = llvm::Function::Create(
-        funcType,
+        functionType,
         llvm::Function::ExternalLinkage,
         node->id.lexeme,
         cgContext.llvmModule
     );
 
+
     // Crear bloque de entrada
     llvm::BasicBlock* entry = llvm::BasicBlock::Create(cgContext.llvmContext, "entry", function);
     cgContext.irBuilder.SetInsertPoint(entry);
 
-    // Scope para variables locales
+
     cgContext.pushLocalScope();
 
     // Asignar parámetros a variables locales
     size_t idx = 0;
     for (auto& arg : function->args()) {
-        arg.setName(dynamic_cast<IdentifierNode*>(node->params[idx])->value.lexeme);
-
-        llvm::AllocaInst* alloca = cgContext.createEntryBlockAlloca(function, llvm::Type::getDoubleTy(cgContext.llvmContext), arg.getName().str());
+       
+        std::string paramName = paramNames[idx];
+        auto paramType = paramTypes[idx];
+        arg.setName(paramName);
+    
+        llvm::AllocaInst* alloca = cgContext.createEntryBlockAlloca(function, paramType, paramName);
         cgContext.irBuilder.CreateStore(&arg, alloca);
-        cgContext.addLocalVariable(arg.getName().str(), alloca);
-
-        ++idx;
-
+        cgContext.addLocalVariable(paramName, alloca);
+        
+        idx++;
     }
 
     // Generar cuerpo
@@ -564,91 +577,11 @@ void LlvmVisitor::visit(MethodNode* node)
     }
 
     
-
     cgContext.popLocalScope(); // restaurar scope anterior
 
     cgContext.irBuilder.SetInsertPoint(prevBlock);
 
-
 }
-
-
-// void LlvmVisitor::visit(IfExpression* node) {
-
-//     llvm::Function* function = cgContext.irBuilder.GetInsertBlock()->getParent();// currentFunction
-
-//     llvm::BasicBlock* endBlock = llvm::BasicBlock::Create(cgContext.llvmContext, "ifend", function);
-//     llvm::PHINode* phi = nullptr;
-
-//     std::vector<std::pair<llvm::BasicBlock*, llvm::Value*>> results;
-
-//     // Generar bloques para cada condicional (if, else if, etc.)
-//     for (size_t i = 0; i < node->exprs_cond.size(); ++i) {
-//         auto [condNode, thenNode] = node->exprs_cond[i];
-
-//         llvm::BasicBlock* condBlock = llvm::BasicBlock::Create(cgContext.llvmContext, "ifcond", function);
-//         llvm::BasicBlock* thenBlock = llvm::BasicBlock::Create(cgContext.llvmContext, "ifthen", function);
-
-//         // Saltar al bloque de la condición
-//         cgContext.irBuilder.CreateBr(condBlock);
-//         cgContext.irBuilder.SetInsertPoint(condBlock);
-
-//         // Generar condición
-//         condNode->accept(*this);
-//         llvm::Value* condValue = lastValue;
-
-//         // Convertir a booleano si es necesario  Si la condición es un double, comparamos con 0.0 para convertirla a booleano (true si diferente de cero).
-//         if (condValue->getType()->isDoubleTy()) {
-//             condValue = cgContext.irBuilder.CreateFCmpONE(
-//                 condValue, llvm::ConstantFP::get(cgContext.llvmContext, llvm::APFloat(0.0)), "booltmp");
-//         }
-
-//         // Crear bloque else o siguiente condicional
-//         llvm::BasicBlock* nextBlock = (i == node->exprs_cond.size() - 1 && node->defaultExp)
-//                                       ? llvm::BasicBlock::Create(cgContext.llvmContext, "ifelse", function)
-//                                       : llvm::BasicBlock::Create(cgContext.llvmContext, "ifnext", function);
-
-//         // Branch basado en condición
-//         cgContext.irBuilder.CreateCondBr(condValue, thenBlock, nextBlock);
-
-//         // THEN block
-//         cgContext.irBuilder.SetInsertPoint(thenBlock);
-//         thenNode->accept(*this);
-//         llvm::Value* thenValue = lastValue;
-//         cgContext.irBuilder.CreateBr(endBlock);
-//         results.push_back({thenBlock, thenValue});
-
-//         // Siguiente bloque condicional (condBlock ya está enlazado)
-//         cgContext.irBuilder.SetInsertPoint(nextBlock);
-//     }
-
-//     // ELSE final
-//     if (node->defaultExp) {
-//         llvm::BasicBlock* elseBlock = cgContext.irBuilder.GetInsertBlock();
-//         node->defaultExp->accept(*this);
-//         llvm::Value* elseValue = lastValue;
-//         cgContext.irBuilder.CreateBr(endBlock);
-//         results.push_back({elseBlock, elseValue});
-//     }
-
-//     // END block
-//     function->insert(function->end(), endBlock);
-//     cgContext.irBuilder.SetInsertPoint(endBlock);
-
-//     // PHI para juntar los resultados
-//     if (!results.empty()) {
-//         phi = cgContext.irBuilder.CreatePHI(results[0].second->getType(), results.size(), "iftmp");
-//         for (auto& [block, value] : results) {
-//             phi->addIncoming(value, block);
-//         }
-//         lastValue = phi;
-//     } else {
-//         lastValue = nullptr;
-//     }
-
-//     cgContext.valueStack.push_back(lastValue);
-
-// }
 
 
 void LlvmVisitor::visit(IfExpression* node) {
@@ -824,7 +757,12 @@ void LlvmVisitor::visit(LetExpression* node)
 
 void LlvmVisitor::visit(FunCallNode* node) {
     // Buscar la función por su nombre
-    llvm::Function* calleeFunc = cgContext.llvmModule.getFunction(node->id.lexeme);
+    std::string methname=node->id.lexeme;
+    if(cgContext.currentType!="")
+    {
+        methname=methname+"_"+cgContext.currentType;
+    }
+    llvm::Function* calleeFunc = cgContext.llvmModule.getFunction(methname);
     
     if (!calleeFunc) {
         std::cerr << "Error: función '" << node->id.lexeme << "' no definida.\n";
@@ -832,8 +770,14 @@ void LlvmVisitor::visit(FunCallNode* node) {
         return;
     }
 
+   
     // Evaluar argumentos
     std::vector<llvm::Value*> args;
+    if(cgContext.currentType!="")
+    {
+        auto sel=new IdentifierNode(Token("self",TokenType::Identifier,0,0));
+        node->arguments.insert(node->arguments.begin(),sel);
+    }
     for (AstNode* argNode : node->arguments) {
         argNode->accept(*this);  // llena lastValue
         if (!lastValue) {
@@ -843,6 +787,7 @@ void LlvmVisitor::visit(FunCallNode* node) {
         }
         args.push_back(lastValue);
     }
+
 
     // Comprobación de aridad
     if (calleeFunc->arg_size() != args.size()) {
@@ -861,11 +806,112 @@ void LlvmVisitor::visit(FunCallNode* node) {
 
 void LlvmVisitor::visit(MemberCall* node) 
 {
-    auto objtype=cgContext.namedTypes[node->obj->getType()];
-    auto meth=dynamic_cast<MethodNode*>(node->member);
-    meth->id.lexeme=meth->id.lexeme+"_"+node->obj->getType();
+    
 
-    meth->accept(*this);
+    node->obj->accept(*this);
+    llvm::Value* objValue=lastValue;
+
+    if (!objValue) 
+      {
+        std::cerr << "Error: objeto de MemberCall no válido\n";
+        lastValue = nullptr;
+        return;
+    }
+    std::string objTypeStr = node->obj->getType();
+    llvm::StructType* objStruct = cgContext.namedStruct[objTypeStr];
+
+    if (!objStruct) {
+        std::cerr << "Error: tipo del objeto no encontrado: " << objTypeStr << "\n";
+        lastValue = nullptr;
+        return;
+    }
+
+    
+    if(auto attr=dynamic_cast<IdentifierNode*>(node->member))
+    {
+        // auto selfAlloca=cgContext.getLocalVariable("self");
+        // auto self=cgContext.irBuilder.CreateLoad(selfAlloca->getAllocatedType(),selfAlloca,"self");
+
+        // auto selftype=cgContext.currentType;
+
+        // auto typenode=cgContext.namedTypeNode[selftype];
+        // auto selfStruct=cgContext.namedStruct[selftype];
+
+        // int index=cgContext.GetIndexOfMember(typenode,attr->value.lexeme);
+        // llvm::Value* memberPtr= cgContext.irBuilder.CreateStructGEP(selfStruct,self,index,"mem_ptr");
+
+        // auto memberType=selfStruct->getElementType(index);
+        // lastValue=cgContext.irBuilder.CreateLoad(memberType,memberPtr,"mem_val");
+        // return;
+        int index = cgContext.GetIndexOfMember(cgContext.namedTypeNode[objTypeStr], attr->value.lexeme);
+        if (index < 0) {
+            std::cerr << "Error: el atributo '" << attr->value.lexeme << "' no existe en " << objTypeStr << "\n";
+            lastValue = nullptr;
+            return;
+
+        }
+
+
+        llvm::Value* gep = cgContext.irBuilder.CreateStructGEP(objStruct, objValue, index, attr->value.lexeme + "_ptr");
+        llvm::Type* attrType = objStruct->getElementType(index);
+        
+        auto temp=cgContext.namedTypeNode[objTypeStr]->atributes[index];
+        auto memberTypeStr=static_cast<AtributeNode*>(temp);
+        if(cgContext.getInteralType(memberTypeStr->type)==nullptr)
+        {
+            auto ptr=llvm::PointerType::get(attrType,0);
+            lastValue = cgContext.irBuilder.CreateLoad(ptr, gep, attr->value.lexeme);
+            return;
+        }
+
+        lastValue = cgContext.irBuilder.CreateLoad(attrType, gep, attr->value.lexeme);
+        return;
+        
+        
+
+       
+    }
+
+    
+   
+ //   auto objtype=cgContext.namedStruct[node->obj->getType()];
+    auto methcall=dynamic_cast<FunCallNode*>(node->member);
+    std::string methodName = methcall->id.lexeme+ "_" +node->obj->getType();
+
+    
+    llvm::Function* calleeFunc = cgContext.llvmModule.getFunction(methodName);
+    
+    if (!calleeFunc) {
+        std::cerr << "Error: función '" << methodName << "' no definida.\n";
+        lastValue = nullptr;
+        return;
+    }
+
+    std::vector<llvm::Value*> args;
+    args.push_back(objValue);
+
+
+    // Evaluar argumentos
+    for (AstNode* argNode : methcall->arguments) {
+        argNode->accept(*this);  // llena lastValue
+        if (!lastValue) {
+            std::cerr << "Error: argumento inválido para llamada a función\n";
+            lastValue = nullptr;
+            return;
+        }
+        args.push_back(lastValue);
+    }
+
+    // Comprobación de aridad
+    if (calleeFunc->arg_size() != args.size()) {
+        std::cerr << "Error: número de argumentos no coincide con la función '" << methodName << "'\n";
+        lastValue = nullptr;
+        return;
+    }
+
+    // Generar llamada
+    lastValue = cgContext.irBuilder.CreateCall(calleeFunc, args, "calltmp");
+  
 
 };
 
@@ -916,7 +962,7 @@ void LlvmVisitor::visit(TypeInstantiation* node) {
     }
     
     // Generar la llamada al constructor. Se obtiene un pointer al objeto instanciado.
-    llvm::Value* obj = cgContext.irBuilder.CreateCall(constructorFunc, args, "instCall");
+    auto obj = cgContext.irBuilder.CreateCall(constructorFunc, args, "calltmp");
     
     // El valor resultante se guarda para continuar la generación del código.
     lastValue = obj;
@@ -953,7 +999,22 @@ void LlvmVisitor::visit(DestructiveAssignNode* node)
     
 }
 
-void LlvmVisitor::visit(AtributeNode* node) {};
+void LlvmVisitor::visit(AtributeNode* node) {
+    if (node->expression) {
+        node->expression->accept(*this);  // Esto debería dejar el resultado en `lastValue`
+    } else {
+        // Default value si no hay inicializador explícito
+        llvm::Type* ty = cgContext.getInteralType(node->getType());
+        if (ty->isDoubleTy()) {
+            lastValue = llvm::ConstantFP::get(ty, 0.0);
+        } else if (ty->isIntegerTy()) {
+            lastValue = llvm::ConstantInt::get(ty, 0);
+        } else {
+            lastValue = llvm::Constant::getNullValue(ty);
+        }
+    }
+}
+
 void LlvmVisitor::visit(UnaryExpression* node)       {};
 void LlvmVisitor::visit(ForExression* node)          {};
 

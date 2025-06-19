@@ -53,7 +53,7 @@ class TypeBuilderVisitor :public Visitor
 
         void visit(MethodNode* node) override
         {  
-            Type* returnType=context->GetType(node->type);
+
             std::vector<Atribute> args;
             
             std::vector<Atribute> arg;

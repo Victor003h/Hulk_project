@@ -269,7 +269,7 @@ class AstBuilderVisitor: public ParseTreeVisitor
                     ParseNode* identifierNode = node->m_children[2]; // "Identifier"
                     ParseNode* funCallPrime = node->m_children[1];   // "FunCallPrime"
                     ParseNode* memberAccessPrime = node->m_children[0]; // "MemberAccessPrime"
-
+                    
                     // 1. Creamos el nodo base: puede ser identifier o llamada a función
                     AstNode* base;
                     if (!funCallPrime->m_children.empty() &&
@@ -280,6 +280,7 @@ class AstBuilderVisitor: public ParseTreeVisitor
                     } else {
                         // Solo es un identificador
                         base = new IdentifierNode(identifierNode->m_token);
+
                     }
 
                     // 2. Ahora procesamos encadenamiento de miembros: .x.y().z
@@ -584,9 +585,8 @@ class AstBuilderVisitor: public ParseTreeVisitor
         AstNode* MemberAccessChain(AstNode* base, ParseNode* memberAccessPrime) 
         {
             if (memberAccessPrime->m_children.empty()) return base;
-
             // Esperado: MemberAccessPrime -> dot Identifier FunCallPrime MemberAccessPrime
-            ParseNode* dotNode = memberAccessPrime->m_children[3]; // "."
+           
             ParseNode* memberId = memberAccessPrime->m_children[2]; // Identifier
             ParseNode* funCallPrime = memberAccessPrime->m_children[1]; // FunCallPrime
             ParseNode* nextMemberAccess = memberAccessPrime->m_children[0]; // MemberAccessPrime
@@ -602,6 +602,7 @@ class AstBuilderVisitor: public ParseTreeVisitor
                 member = new IdentifierNode(memberId->m_token);
             }
 
+            
             AstNode* access = new MemberCall(base, member);
             return MemberAccessChain(access, nextMemberAccess); // recursión
 }

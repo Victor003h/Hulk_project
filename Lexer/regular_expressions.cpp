@@ -1,6 +1,5 @@
 #include<set>
-#include "FA.h"
-#pragma once
+#include "FA.cpp"
 class RE
 {
     public:
@@ -148,5 +147,6 @@ class ClousureRE:public RE
         }
 
 };
+
 
 

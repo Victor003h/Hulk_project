@@ -50,7 +50,6 @@ int main() {
     semantic.check(ast);
     if(semantic.errorHandler.hasErrors())
     {
-      
       return 0;
     };
 
@@ -60,9 +59,7 @@ int main() {
 
     codegen.generateIR(ast);
 
-    codegen.dumpIR("output.ll");
+    codegen.dumpIR();
     return 0;
 
-
-  
 }

@@ -1,5 +1,6 @@
 #include "context.h"
 #include "../Parser/AstNodes.h"
+#include"../common/Error.hpp"
 
 class FunctionCollectorVisitor: public Visitor
 {
@@ -30,7 +31,6 @@ class FunctionCollectorVisitor: public Visitor
             return;
         }
 
-        Type* returnType=context->GetType(node->getType());
         std::vector<Atribute> args;
         for(auto param:node->params)
         {

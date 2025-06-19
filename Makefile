@@ -3,7 +3,7 @@ CXXFLAGS = -std=c++17 -I./src -Wall -g
 SRC = $(wildcard src/*.cpp)
 OBJ = $(SRC:.cpp=.o)
 BIN = hulk/hulk.exe
-LLFILE = hulk/hulk.ll
+LLFILE = hulk/output.ll
 
 all: execute
 
@@ -24,8 +24,13 @@ execute: $(LLFILE)
 
 # El archivo .ll depende del ejecutable y se genera al ejecutarlo
 $(LLFILE): $(BIN)
-	@echo "Archivo LLVM IR no existe, generando..."
-	$(BIN)
+	@if [ -f $(LLFILE) ]; then \
+		echo "Ejecutando LLVM IR: $(LLFILE)"; \
+		lli $(LLFILE); \
+	else \
+		echo "ERROR: No se generó $(LLFILE). No se ejecutará nada."; \
+		exit 1; \
+	fi
 
 clean:
 	rm -f hulk/*.exe hulk/*.ll

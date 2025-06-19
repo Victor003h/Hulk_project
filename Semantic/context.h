@@ -61,7 +61,8 @@ struct Type
     {
         return atributes.find(name)!=atributes.end();
     }
-     bool exist_Argument(std::string name)
+     
+    bool exist_Argument(std::string name)
     {
         for(auto[argname,_] :arguments)
         {
@@ -75,13 +76,24 @@ struct Type
 
     bool exist_Method(std::string name)
     {
-        return methods.find(name)!=methods.end();
+        if(methods.find(name)!=methods.end())   return true;
+        if(parent==nullptr) return false;
+        return parent->GetMethod(name);
     }
 
+    
     void DefineMethod(std::string name,std::string type,std::vector<Atribute> paramaters)
     {
         
         methods.emplace(name,new Method(name,paramaters,type));
+        
+    }
+
+    Method* GetMethod(std::string name)
+    {
+        if(methods.find(name)!=methods.end())   return methods[name];
+        if(parent==nullptr) return nullptr;
+        return parent->GetMethod(name);
         
     }
 

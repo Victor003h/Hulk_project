@@ -1,7 +1,7 @@
 #include<string>
 #include<set>
 #include <iostream>
-#include "regular_expressions.h"
+#include "regular_expressions.cpp"
 #include <map>
 #include "../common/Error.hpp"
 
@@ -77,7 +77,6 @@ class Lexer
                 {TokenType::punc_Dot,          "."}        // ("dot", ".")
             };
 
-
             this->tokens_regExp=tokens;
             std::vector<NFA> nfas={};
             
@@ -92,30 +91,6 @@ class Lexer
                 }
                 nfas.push_back(nfa);
 
-
-
-                // if( existAutamata(pair.first) )
-                // {
-                    
-                //     DFA* dfa = DFA::loadFromFile(getString(pair.first));
-                //     automatas[pair.first]=*dfa;
-                // }
-                // else
-                // {
-                //     RE* n= linear_reguex(pair.second);
-                //     n->type=pair.first;
-                //     NFA nfa= n->ConvertToNFA();
-                //     for(int fs:nfa.final_states)
-                //     {
-                //         nfa.m_final_token_types[fs]=pair.first;
-                //     }
-
-                //     DFA dfa=nfa.convertToDFA();
-                //     dfa.saveToFile(getString(pair.first));
-                //     //nfas.push_back(nfa);
-                //     automatas[pair.first]=dfa;
-                // }
-               
             }
 
             auto digitis_re=digits_reguex();
@@ -149,57 +124,7 @@ class Lexer
             DFA dfa= nfa.convertToDFA();
             finaldfa=dfa;
             
-            
-
-            // if( existAutamata(Number) )
-            // {
-            //     DFA* dfa = DFA::loadFromFile(getString(Number));
-            //     automatas[Number]=*dfa;
-            // }
-            // else
-            // {
-            //     auto digitis_re=digits_reguex();
-            //     NFA nfa_d=digitis_re->ConvertToNFA();
-            //     for(int fs:nfa_d.final_states)
-            //     {
-            //         nfa_d.m_final_token_types[fs]=Number;
-            //     }
-            //     DFA dfa=nfa_d.convertToDFA();
-            //     dfa.saveToFile(getString(Number));
-            //     //nfas.push_back(nfa_d);
-            //     automatas[Number]= dfa;
-            // }
-
-            // if( existAutamata(Identifier) )
-            // {
-            //     DFA* dfa = DFA::loadFromFile(getString(Identifier));
-            //     automatas[Identifier]=*dfa;
-            // }
-            // else
-            // {
-            //    auto identifier_re=buildIdentifierRE();
-            //     NFA nfa_i=identifier_re->ConvertToNFA();
-            //     for(int fs:nfa_i.final_states)
-            //     {
-            //         nfa_i.m_final_token_types[fs]=Identifier;
-            //     }
-            //     DFA dfa=nfa_i.convertToDFA();
-            //     dfa.saveToFile(getString(Identifier));
-            //     //nfas.push_back(nfa_i);
-            //     automatas[Identifier]=dfa;
-            // }
-
-            // NFA nfa=nfas[0];
-
-            // for (int i=1; i<nfas.size();i++)
-            // {
-            //     nfa= NFA::UnionRE(nfa,nfas[i]);
-            // }
-            
-            // DFA dfa= nfa.convertToDFA();
-            
-            // automatas.push_back(dfa);
-                        
+                                    
         }
 
         
@@ -253,7 +178,7 @@ class Lexer
 
             RE* result = new SymbolRE(symbols[0]);
             
-            // Para cada símbolo adicional, lo unimos al resultado actual.
+            
             for (size_t i = 1; i < symbols.size(); ++i) {
                 result = new UnionRE(result, new SymbolRE(symbols[i]));
             }
@@ -269,7 +194,6 @@ class Lexer
 
             RE* subsequentChar = unionOfSymbols("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_");
             //RE* subsequentChar = unionOfSymbols("af8");
-
            
             RE* subsequentStar = new ClousureRE(subsequentChar);
 
@@ -283,7 +207,7 @@ class Lexer
         {
             
             std::vector<Token> tokens={};
-            int cr=0;
+            size_t cr=0;
 
             while(cr<inp.size())
             {
@@ -315,7 +239,7 @@ class Lexer
                 
 
                // Token token= scanToken(inp,cr);
-                Token token= scanToken2(inp,cr);
+                Token token= scanToken(inp,cr);
                 if(token.type==TokenType::Error)
                 {
                     errorHandler.reportError(token,"Lexical error: unrecognized token ");
@@ -329,40 +253,8 @@ class Lexer
             return tokens;
         }
 
-        // Token scanToken(std::string inp,int cr)
-        // {
-        //     std::pair<TokenType,int> matched={Error,-1};
-
-        //     for (auto pair :automatas)
-        //     {
-        //         int currentpos= cr;
-        //         int currentState=pair.second.getStartState();
-                
-        //         while(cr<inp.length())
-        //         {
-        //             char n=inp[currentpos];
-        //             int nextstate=pair.second.nextState(n,currentState);
-        //             if (nextstate==-1)  break;
-        //             currentState=nextstate;
-        //             currentpos++;
-            
-        //         }
-        //         if (pair.second.is_final_state(currentState) &&matched.second< currentpos-cr)
-        //         {
-        //             matched={pair.first,currentpos-cr};
-        //         }
-        //     }
-
-        //     if (matched.second==-1)
-        //     {
-        //         return Token("error",Error,this->currentLine,this->currentCol);
-        //     }
-
-        //     return Token(inp.substr(cr,matched.second),matched.first,currentLine,currentCol);
-
-        // }
     
-        Token scanToken2(std::string inp,int cr)
+        Token scanToken(std::string inp,size_t cr)
         {
            // std::pair<TokenType,int> matched={Error,-1};
 
@@ -390,10 +282,5 @@ class Lexer
 
     };
 
-// void testTokenize(Lexer lex,std::string type,std::string inp, bool expected)
-// {
-//     bool res=lex.is_valid_token(type,inp);
-//     std::cout<<"Input: "<<inp<<", res: "<<res<<", esperado: "<<expected <<std::endl;
-// }
 
 

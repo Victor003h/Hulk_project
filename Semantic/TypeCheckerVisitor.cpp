@@ -23,15 +23,7 @@ class TypeCheckerVisitor:Visitor
     
         void visit(TypeNode* node)  override
         {
-        
-
-            if(context->exist_Type(node->name.lexeme))
-            {
-                std::string msg="The class"+ node->name.lexeme+" already exists";
-                errorHandler.reportError(node->name,msg);
-                return;
-            }
-            
+                    
            auto lastType=currentType;
 
            context=context->createChildContext();
@@ -40,21 +32,7 @@ class TypeCheckerVisitor:Visitor
             
            if(node->parentName.lexeme!="")
            {
-            if(!context->exist_Type(node->parentName.lexeme))
-            {
-                std::string msg="The class"+ node->parentName.lexeme+"  is not defined";
-                errorHandler.reportError(node->parentName,msg);
-                return;
-            }
-            parent= context->GetType(node->parentName.lexeme);
-
-            if(node->parent_args.size()!= parent->atributes.size())
-            {
-                std::string msg="Invalid value of arguments";
-                errorHandler.reportError(node->parentName,msg);
-                return;
-            }
-            
+                parent= context->GetType(node->parentName.lexeme);    
            }
 
             currentType=context->CreateType(node->name.lexeme);
