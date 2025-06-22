@@ -28,7 +28,6 @@ public:
 
     std::unordered_map<std::string, llvm::StructType*> namedStruct;
     std::unordered_map<std::string, TypeNode*> namedTypeNode;
-    std::unordered_map<std::string, std::vector<std::string>> classMemberNames;
 
     std::string currentType;
     
@@ -147,6 +146,8 @@ public:
     llvm::Value* lastValue;
     llvm::Function* currentFunction;
 
+
+
     LlvmVisitor(CodeGenerationContext &cgContext)
     : cgContext(cgContext),lastValue(nullptr){}
 
@@ -254,39 +255,37 @@ void LlvmVisitor::visit(ProgramNode* node)
 
 
 void LlvmVisitor::visit(TypeNode* node) {
-
-   
-    std::vector<std::string> attrNames;
+    
     std::vector<llvm::Type*> attrTypes;
    
-    for (AstNode* attr : node->atributes) {
+    if(node->parentName.lexeme!="")
+    {
+        attrTypes.push_back(cgContext.namedStruct[node->parentName.lexeme]);
+    }
+
+    for (AstNode* attr : node->atributes) // tipo de los atributos
+    {
         std::string attrTypeName = attr->getType();
 
         
         if ( cgContext.getInteralType(attrTypeName)) {
             llvm::Type* type = cgContext.getInteralType(attrTypeName);
             attrTypes.push_back(type);
-            attrNames.push_back(static_cast<AtributeNode*>(attr)->id.lexeme);
            
         }
         else
         {
             llvm::Type* type = cgContext.namedStruct[attrTypeName];
-            attrTypes.push_back(type);
-            attrNames.push_back(static_cast<AtributeNode*>(attr)->id.lexeme);
+            attrTypes.push_back(type->getPointerTo());
         
         }
-    
     }
  
     if (attrTypes.empty()) 
     {
         attrTypes.push_back(llvm::Type::getInt8Ty(cgContext.llvmContext));
     }
-    cgContext.classMemberNames[node->name.lexeme]=attrNames;
-
-   
-
+  
     llvm::StructType* structType = llvm::StructType::create(cgContext.llvmContext, attrTypes, node->name.lexeme);
     cgContext.namedStruct[node->name.lexeme] = structType;
     cgContext.namedTypeNode[node->name.lexeme]=node;
@@ -296,12 +295,43 @@ void LlvmVisitor::visit(TypeNode* node) {
 
     std::vector<llvm::Type*> ParamTypes;
 
-    for (AstNode* arg : node->args) {
+    for (AstNode* arg : node->args)  // tipo de los argumetnsp para el const
+    {
         std::string argTypeName = arg->getType();
-        ParamTypes.push_back(cgContext.namedStruct[argTypeName]);
+         if ( cgContext.getInteralType(argTypeName)) {
+            llvm::Type* type = cgContext.getInteralType(argTypeName);
+            ParamTypes.push_back(type);
+           
+        }
+        else
+        {
+            auto st=cgContext.namedStruct[argTypeName];
+
+            ParamTypes.push_back(st->getPointerTo());
+        }
+    }
+
+    TypeNode* parent=nullptr;
+
+    if(node->parentName.lexeme!="")
+    {
+        parent=cgContext.namedTypeNode[node->parentName.lexeme];
     }
 
     std::string constructorName = "new_" + node->name.lexeme;
+    bool useParentConst=false;
+    if(ParamTypes.empty() && parent)// usar parametros del padre
+    {
+        useParentConst=true;
+        llvm::Function* parentConst= cgContext.llvmModule.getFunction("new_"+parent->name.lexeme);
+        auto parentArgs=parentConst->args();
+        for(auto &arg:parentArgs)
+        {
+            ParamTypes.push_back(arg.getType());
+        }
+
+    }
+
     llvm::FunctionType* constructorType = llvm::FunctionType::get(
         llvm::PointerType::get(structType, 0),
         ParamTypes,
@@ -315,22 +345,12 @@ void LlvmVisitor::visit(TypeNode* node) {
     );
 
     // 6. Construir el cuerpo del constructor.
+    auto prevInsertPoint = cgContext.irBuilder.GetInsertBlock();
     llvm::BasicBlock* constructorBB = llvm::BasicBlock::Create(cgContext.llvmContext, "entry", constructorFunc);
-    llvm::IRBuilder<> constructorBuilder(constructorBB);
-
-    cgContext.pushLocalScope();
-    unsigned argIndex = 0;
-    for (auto& arg : constructorFunc->args()) {
-        arg.setName(dynamic_cast<IdentifierNode*>(node->args[argIndex])->value.lexeme);
-
-        llvm::AllocaInst* alloca = cgContext.createEntryBlockAlloca(constructorFunc, arg.getType(), arg.getName().str());
-        constructorBuilder.CreateStore(&arg, alloca);
-        cgContext.addLocalVariable(arg.getName().str(), alloca);
-        ++argIndex;
-    }
-
+    cgContext.irBuilder.SetInsertPoint(constructorBB);
+    
     llvm::Value* structSize = llvm::ConstantExpr::getSizeOf(structType);
-    llvm::Function* mallocFunc = cgContext.llvmModule.getFunction("malloc");  // todo:que es
+    llvm::Function* mallocFunc = cgContext.llvmModule.getFunction("malloc");
 
     if (!mallocFunc) {
         llvm::FunctionType* mallocType = llvm::FunctionType::get(llvm::PointerType::get(llvm::Type::getInt8Ty(cgContext.llvmContext), 0),
@@ -340,19 +360,78 @@ void LlvmVisitor::visit(TypeNode* node) {
         mallocFunc = llvm::Function::Create(mallocType, llvm::Function::ExternalLinkage, "malloc", cgContext.llvmModule);
     }
     
-    llvm::Value* rawPtr = constructorBuilder.CreateCall(mallocFunc, { structSize });  //todo: que es 
-    llvm::Value* typedPtr = constructorBuilder.CreateBitCast(rawPtr, llvm::PointerType::get(structType, 0));    //todo: que es
+    llvm::Value* rawPtr = cgContext.irBuilder.CreateCall(mallocFunc, { structSize });  
+    llvm::Value* typedPtr = cgContext.irBuilder.CreateBitCast(rawPtr, llvm::PointerType::get(structType, 0)); 
 
   //  llvm::AllocaInst* selfAlloca = cgContext.createEntryBlockAlloca(constructorFunc, typedPtr->getType(), "self");
   //  constructorBuilder.CreateStore(typedPtr, selfAlloca);
   //  cgContext.addLocalVariable("self", selfAlloca);
+ 
+
+     //agrego los argumento de la clase como varibales locales del construc para usarlos en la inicializacion de los atributos
+    cgContext.pushLocalScope();
+
+    unsigned argIndex = 0;
+    if(!node->args.empty())
+    {
+        for (auto& arg : constructorFunc->args()) {
+        arg.setName(dynamic_cast<IdentifierNode*>(node->args[argIndex])->value.lexeme);
+
+        llvm::AllocaInst* alloca = cgContext.createEntryBlockAlloca(constructorFunc, arg.getType(), arg.getName().str());
+        cgContext.irBuilder.CreateStore(&arg, alloca);
+        cgContext.addLocalVariable(arg.getName().str(), alloca);
+        ++argIndex;
+        }
+    }
+   
+    if(useParentConst)
+    {
+        std::vector<llvm::Value*> parentArgValues;
+        auto structParent=cgContext.namedStruct[node->parentName.lexeme];
+        auto parentConst=cgContext.llvmModule.getFunction("new_"+node->parentName.lexeme);
+        for (auto argsIter = constructorFunc->arg_begin(); argsIter < constructorFunc->arg_end(); argsIter++)
+        {
+            parentArgValues.push_back(argsIter);
+        }
+        
+        auto parentValue=cgContext.irBuilder.CreateCall(parentConst,parentArgValues,node->parentName.lexeme);
+        llvm::Value* parentPtr= cgContext.irBuilder.CreateStructGEP(structType,typedPtr,0,"base");
+
+        llvm::Value* dest=cgContext.irBuilder.CreateBitCast(parentPtr,llvm::PointerType::get(structParent, 0));
+        llvm::Value* src=cgContext.irBuilder.CreateBitCast(parentValue,llvm::PointerType::get(structParent, 0));
+
+        llvm::StructType* parentStruct = cgContext.namedStruct[parent->name.lexeme];
+        llvm::Value* size = llvm::ConstantExpr::getSizeOf(parentStruct);
+        cgContext.irBuilder.CreateMemCpy(dest, llvm::MaybeAlign(8), src, llvm::MaybeAlign(8), size);
+    }
+
+    if(parent && !useParentConst)
+    {
+        std::vector<llvm::Value*> parentArgValues;
+        auto structParent=cgContext.namedStruct[node->parentName.lexeme];
+        auto parentConst=cgContext.llvmModule.getFunction("new_"+node->parentName.lexeme);
+        for(auto arg:node->parent_args)
+        {
+            arg->accept(*this);
+            parentArgValues.push_back(lastValue);
+        }
+        lastValue=nullptr;
+        auto parentValue=cgContext.irBuilder.CreateCall(parentConst,parentArgValues,node->parentName.lexeme);
+        llvm::Value* parentPtr= cgContext.irBuilder.CreateStructGEP(structType,typedPtr,0,"base");
+
+        llvm::Value* dest=cgContext.irBuilder.CreateBitCast(parentPtr,llvm::PointerType::get(structParent, 0));
+        llvm::Value* src=cgContext.irBuilder.CreateBitCast(parentValue,llvm::PointerType::get(structParent, 0));
+
+        llvm::StructType* parentStruct = cgContext.namedStruct[parent->name.lexeme];
+        llvm::Value* size = llvm::ConstantExpr::getSizeOf(parentStruct);
+        cgContext.irBuilder.CreateMemCpy(dest, llvm::MaybeAlign(8), src, llvm::MaybeAlign(8), size);
+    }
+
 
     unsigned memberIndex = 0;
+    if(parent) memberIndex=1;
     lastValue = nullptr;
-
-    auto prevInsertPoint = cgContext.irBuilder.GetInsertBlock();
-    cgContext.irBuilder.SetInsertPoint(constructorBB);
-
+    
     for (AstNode* attr : node->atributes) 
     {
         auto atr=static_cast<AtributeNode*>(attr);
@@ -365,17 +444,18 @@ void LlvmVisitor::visit(TypeNode* node) {
             initValue = llvm::ConstantFP::get(cgContext.llvmContext, llvm::APFloat(0.0));
         }
 
-        llvm::Value* memberPtr =constructorBuilder.CreateStructGEP(structType,typedPtr,memberIndex,atr->id.lexeme);
-        constructorBuilder.CreateStore(initValue,memberPtr);
+        llvm::Value* memberPtr =cgContext.irBuilder.CreateStructGEP(structType,typedPtr,memberIndex,atr->id.lexeme);
+        cgContext.irBuilder.CreateStore(initValue,memberPtr);
 
        
         ++memberIndex;
     }
+    cgContext.irBuilder.CreateRet(typedPtr);
+    
     cgContext.irBuilder.SetInsertPoint(prevInsertPoint);
 
-    constructorBuilder.CreateRet(typedPtr);
-     
-
+   
+    
     for (AstNode* method : node->methods) {
         if (auto methodNode = dynamic_cast<MethodNode*>(method)) {
             std::string methName = methodNode->id.lexeme;
@@ -503,7 +583,7 @@ void LlvmVisitor::visit(IdentifierNode* node)
 void LlvmVisitor::visit(MethodNode* node) 
 {
     llvm::BasicBlock* prevBlock = cgContext.irBuilder.GetInsertBlock();
-
+    
     std::vector<llvm::Type*> paramTypes;
     std::vector<std::string> paramNames;
     for (auto* paramNode : node->params) 
@@ -522,16 +602,39 @@ void LlvmVisitor::visit(MethodNode* node)
             paramType=cgContext.getInteralType(typeStr);
         else
         {
-            paramType=cgContext.namedStruct[typeStr];
+            auto structtype= cgContext.namedStruct[typeStr];
+            paramType=structtype->getPointerTo();
         }
 
         paramTypes.push_back(paramType);
         paramNames.push_back(id->value.lexeme);
+
+       
+    
+
     }
+
+    llvm::Type* returnType=nullptr;
+
+    std::string returnTypeStr=node->type;
+    if(  cgContext.getInteralType(returnTypeStr)!=nullptr)
+        {
+            returnType=cgContext.getInteralType(returnTypeStr);
+        }
+    else{
+        auto structtype= cgContext.namedStruct[returnTypeStr];
+        returnType=structtype->getPointerTo();
+    }
+       
+    if(returnTypeStr=="Object") 
+    {
+        returnType=llvm::Type::getDoubleTy(cgContext.llvmContext);
+    }
+    
 
 
     llvm::FunctionType* functionType = llvm::FunctionType::get(
-        llvm::Type::getDoubleTy(cgContext.llvmContext), // tipo de retorno por ahora es double ,cambiar
+        returnType,
         paramTypes,
         false
     );
@@ -548,6 +651,8 @@ void LlvmVisitor::visit(MethodNode* node)
     llvm::BasicBlock* entry = llvm::BasicBlock::Create(cgContext.llvmContext, "entry", function);
     cgContext.irBuilder.SetInsertPoint(entry);
 
+    auto lastF=currentFunction;
+    currentFunction=function;
 
     cgContext.pushLocalScope();
 
@@ -562,12 +667,13 @@ void LlvmVisitor::visit(MethodNode* node)
         llvm::AllocaInst* alloca = cgContext.createEntryBlockAlloca(function, paramType, paramName);
         cgContext.irBuilder.CreateStore(&arg, alloca);
         cgContext.addLocalVariable(paramName, alloca);
-        
         idx++;
     }
 
     // Generar cuerpo
     node->body->accept(*this);
+
+
 
     // Manejo de retorno
     if (lastValue) {
@@ -576,7 +682,7 @@ void LlvmVisitor::visit(MethodNode* node)
         cgContext.irBuilder.CreateRet(llvm::ConstantFP::get(cgContext.llvmContext, llvm::APFloat(0.0))); // default
     }
 
-    
+    currentFunction=lastF;
     cgContext.popLocalScope(); // restaurar scope anterior
 
     cgContext.irBuilder.SetInsertPoint(prevBlock);
@@ -753,7 +859,6 @@ void LlvmVisitor::visit(LetExpression* node)
 
 };
 
- 
 
 void LlvmVisitor::visit(FunCallNode* node) {
     // Buscar la función por su nombre
@@ -807,7 +912,6 @@ void LlvmVisitor::visit(FunCallNode* node) {
 void LlvmVisitor::visit(MemberCall* node) 
 {
     
-
     node->obj->accept(*this);
     llvm::Value* objValue=lastValue;
 
@@ -843,17 +947,19 @@ void LlvmVisitor::visit(MemberCall* node)
         // auto memberType=selfStruct->getElementType(index);
         // lastValue=cgContext.irBuilder.CreateLoad(memberType,memberPtr,"mem_val");
         // return;
-        int index = cgContext.GetIndexOfMember(cgContext.namedTypeNode[objTypeStr], attr->value.lexeme);
+        auto typenode=cgContext.namedTypeNode[objTypeStr];
+        int index = cgContext.GetIndexOfMember(typenode, attr->value.lexeme);
+        int structIndex=index;
         if (index < 0) {
             std::cerr << "Error: el atributo '" << attr->value.lexeme << "' no existe en " << objTypeStr << "\n";
             lastValue = nullptr;
             return;
 
         }
+        if( typenode->parentName.lexeme!="" ) structIndex++;
 
-
-        llvm::Value* gep = cgContext.irBuilder.CreateStructGEP(objStruct, objValue, index, attr->value.lexeme + "_ptr");
-        llvm::Type* attrType = objStruct->getElementType(index);
+        llvm::Value* gep = cgContext.irBuilder.CreateStructGEP(objStruct, objValue, structIndex, attr->value.lexeme + "_ptr");
+        llvm::Type* attrType = objStruct->getElementType(structIndex);
         
         auto temp=cgContext.namedTypeNode[objTypeStr]->atributes[index];
         auto memberTypeStr=static_cast<AtributeNode*>(temp);
@@ -867,20 +973,40 @@ void LlvmVisitor::visit(MemberCall* node)
         lastValue = cgContext.irBuilder.CreateLoad(attrType, gep, attr->value.lexeme);
         return;
         
-        
-
-       
     }
 
     
    
- //   auto objtype=cgContext.namedStruct[node->obj->getType()];
+ //  auto objtype=cgContext.namedStruct[node->obj->getType()];
     auto methcall=dynamic_cast<FunCallNode*>(node->member);
-    std::string methodName = methcall->id.lexeme+ "_" +node->obj->getType();
-
-    
+    std::string methodName = methcall->id.lexeme+ "_" +node->obj->getType();    
     llvm::Function* calleeFunc = cgContext.llvmModule.getFunction(methodName);
-    
+    std::string currentTypeStr = node->obj->getType();
+    llvm::Value* currentObj = objValue;
+
+    while (!calleeFunc && !currentTypeStr.empty()) 
+    {
+        // Si no se encontró la función, buscar en el padre
+        auto typeNode = cgContext.namedTypeNode[currentTypeStr];
+        if (!typeNode || typeNode->parentName.lexeme=="Object") {
+            break; 
+        }
+
+        // Obtener el nombre del nuevo método a buscar (en el padre)
+        currentTypeStr = typeNode->parentName.lexeme;
+        methodName = methcall->id.lexeme + "_" + currentTypeStr;
+        calleeFunc = cgContext.llvmModule.getFunction(methodName);
+
+        // Acceder al campo 0 (padre) del struct actual
+        llvm::StructType* structType = cgContext.namedStruct[node->obj->getType()];
+        llvm::Value* parentPtr = cgContext.irBuilder.CreateStructGEP(structType, currentObj, 0, "parent_ptr");
+
+        // Bitcast a tipo del padre
+        llvm::PointerType* parentTypePtr = llvm::PointerType::get(cgContext.namedStruct[currentTypeStr], 0);
+        currentObj = cgContext.irBuilder.CreateBitCast(parentPtr, parentTypePtr, "as_parent");
+
+    }
+
     if (!calleeFunc) {
         std::cerr << "Error: función '" << methodName << "' no definida.\n";
         lastValue = nullptr;
@@ -987,7 +1113,27 @@ void LlvmVisitor::visit(DestructiveAssignNode* node)
             return;
         }
 
-    } 
+    }
+    else if(auto selfmember = dynamic_cast<MemberCall*>(node->lhs))
+    {
+        auto attr=dynamic_cast<IdentifierNode*>(selfmember->member);
+        auto  selfValue=cgContext.getLocalVariable("self");
+        std::string objTypeStr = selfmember->obj->getType();
+
+        llvm::StructType* objStruct = cgContext.namedStruct[objTypeStr];
+        int index = cgContext.GetIndexOfMember(cgContext.namedTypeNode[objTypeStr], attr->value.lexeme);
+        if (index < 0) {
+            std::cerr << "Error: el atributo '" << attr->value.lexeme << "' no existe en " << objTypeStr << "\n";
+            lastValue = nullptr;
+            return;
+
+        }
+        llvm::Value* gep = cgContext.irBuilder.CreateStructGEP(objStruct, selfValue, index, attr->value.lexeme + "_ptr");
+        cgContext.irBuilder.CreateStore(right, gep);
+        lastValue = right;
+        return;
+
+    }
     else {
         std::cerr << "Error: LHS de := no soportado\n";
         return;

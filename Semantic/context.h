@@ -40,6 +40,8 @@ struct Type
     std::vector<std::pair<std::string,Atribute*>>arguments;
     std::map<std::string,Method*> methods;
     Type* parent=nullptr;
+    std::string parentInstantiation;
+
 
     Type(std::string name)
     :name(name){}
@@ -213,6 +215,7 @@ class Context
             return parent->exist_Method(name);
             
         }
+      
         Method* GetMethod(std::string name)
         {
             if(methods.find(name)!=methods.end())   return methods[name];
@@ -241,7 +244,7 @@ class Context
             return parent;
         }
 
-        void loadInternalType()
+        void loadInternalTypeAndMethod()
         {
             Type* object= CreateType(INTERNAL_TYPES[0]);
             for(size_t i=1 ; i< INTERNAL_TYPES.size();i++)
@@ -249,6 +252,8 @@ class Context
                 auto t=CreateType(INTERNAL_TYPES[i]);
                 t->parent=object;
             }
+
+            DefineMethod("print","Object",{Atribute("value","Object")});
 
         }
 

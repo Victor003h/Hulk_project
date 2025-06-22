@@ -1,15 +1,14 @@
 #include<string>
 #include<set>
 #include <iostream>
-#include "regular_expressions.cpp"
 #include <map>
 #include "../common/Error.hpp"
+#include "regexParser.cpp"
 
 class Lexer
 {
     private:
         std::vector<pair<TokenType,std::string>>tokens_regExp;
-        std::map<TokenType,DFA> automatas={};
         DFA finaldfa;
         int currentLine=0;
         int currentCol=0;
@@ -77,39 +76,87 @@ class Lexer
                 {TokenType::punc_Dot,          "."}        // ("dot", ".")
             };
 
-            this->tokens_regExp=tokens;
+            // if(DFA::existsDfa())
+            // {
+            //     finaldfa=DFA::load_binary();
+            //     return;
+            // }
+
+                //    ([^//" ] |.^)*
+                //     
+            std::vector<std::tuple<TokenType, std::string>> patterns={
+                 {TokenType::String,      "\\\"(.)*\\\""},
+                {TokenType::op_Modulo,       "%"},   // ("modOp", "%")
+                {TokenType::punc_at,           "@"},   // ("at", "@")
+                {TokenType::punc_doubleAt,     "@@"},  // ("doubleAt", "@@")
+                {TokenType::kw_extends,      "extends"}, // ("extends", "extends")
+                {TokenType::punc_LeftBracket,  "\\["},   // ("lbracket", "[")
+                {TokenType::punc_RightBracket, "\\]"},   // ("rbracket", "]")
+                {TokenType::punc_LeftBrace,    "{"},   // ("lbrace", "{")
+                {TokenType::punc_RightBrace,   "}"},   // ("rbrace", "}")
+                {TokenType::punc_LeftParen,    "\\("},   // ("lparen", "(")
+                {TokenType::punc_RightParen,   "\\)"},   // ("rparen", ")")
+                {TokenType::op_Greater,      ">"},   // ("greater", ">")
+                {TokenType::op_Less,         "<"},   // ("less", "<")
+                {TokenType::punc_Semicolon,    ";"},   // ("semicolon", ";")
+                {TokenType::punc_Colon,        ":"},   // ("colon", ":")
+                {TokenType::punc_Comma,        ","},   // ("comma", ",")
+                 {TokenType::kw_type,         "type"},// ("type", "type")
+                {TokenType::arrow,        "=>"},  // ("arrow", "=>")
+                {TokenType::Assignment,   "="},   // ("equal", "=")
+                // Palabras clave y otros tokens de la lista original
+                {TokenType::kw_if,           "if"},        // sustituido a "if"
+                {TokenType::kw_else,         "else"},      // sustituido a "else"
+                {TokenType::kw_elif,         "elif"},
+                {TokenType::kw_protocol,     "protocol"},
+                {TokenType::kw_in,           "in"},
+                {TokenType::kw_let,          "let"},
+                {TokenType::kw_function,     "function"},
+                {TokenType::kw_inherits,     "inherits"},
+                {TokenType::kw_extends,      "extends"},   // se repite según la lista original
+                {TokenType::kw_while,        "while"},     // sustituido a "while"
+                {TokenType::kw_for,          "for"},       // sustituido a "for"
+                {TokenType::kw_true_,        "true"},
+                {TokenType::kw_false_,       "false"},
+                {TokenType::kw_new_,         "new"},
+                {TokenType::kw_null_,        "null"},
+                {TokenType::kw_is,         "is"},
+                {TokenType::kw_as,         "as"},
+                {TokenType::op_destruc,    ":="},
+                {TokenType::op_LogicalOr,    "\\|\\|"},      // ("doubleOr", "||")
+                {TokenType::op_Or,           "\\|"},       // ("or", "|")
+                {TokenType::op_And,          "&"},       // ("and", "&")
+                {TokenType::op_LogicalAnd,    "&&"},      // ("doubleOr", "||")
+                {TokenType::op_Equal,        "=="},      // ("doubleEqual", "==")
+                {TokenType::op_NotEqual,     "!="},      // ("notEqual", "!=")
+                {TokenType::op_Not,          "!"},       // ("not", "!")
+                {TokenType::op_GreaterEqual, ">="},      // ("greaterEq", ">=")
+                {TokenType::op_LessEqual,    "<="},      // ("lessEq", "<=")
+                {TokenType::op_Plus,         "\\+"},       // ("plus", "+")
+                {TokenType::op_Minus,        "\\-"},       // ("minus", "-")
+                {TokenType::op_Multiply,     "\\*"},       // ("star", "*")
+                {TokenType::op_Divide,       "/"},       // ("div", "/")
+                {TokenType::op_Exp,         "^"},         
+                {TokenType::punc_Dot,          "\\."},        // ("dot", "."
+                {TokenType::Number,      "[0-9]*([.][0-9]+)?"},
+                {TokenType::Identifier,      "[a-zA-Z]+[a-zA-Z0-9_]*"},
+            };
+
+    
+
             std::vector<NFA> nfas={};
-            
-            for (auto pair :tokens)
+        
+            for(auto [type,pat]:patterns)
             {
-                RE* n= linear_reguex(pair.second);
-                n->type=pair.first;
-                NFA nfa= n->ConvertToNFA();
+                RegexParser p(pat);
+                auto reg=p.parse();
+                NFA nfa=reg->ConvertToNFA();
                 for(int fs:nfa.final_states)
-                {
-                    nfa.m_final_token_types[fs]=pair.first;
-                }
+                 {
+                    nfa.m_final_token_types[fs]=type;
+                 }
                 nfas.push_back(nfa);
-
             }
-
-            auto digitis_re=digits_reguex();
-            NFA nfa_d=digitis_re->ConvertToNFA();
-            for(int fs:nfa_d.final_states)
-            {
-                nfa_d.m_final_token_types[fs]=Number;
-            }
-            nfas.push_back(nfa_d);
-
-
-            auto identifier_re=buildIdentifierRE();
-            NFA nfa_i=identifier_re->ConvertToNFA();
-            for(int fs:nfa_i.final_states)
-            {
-                nfa_i.m_final_token_types[fs]=Identifier;
-            }
-            nfas.push_back(nfa_i);
-
 
             NFA nfa=nfas[0];
 
@@ -117,91 +164,109 @@ class Lexer
             {
                 nfa= NFA::UnionRE(nfa,nfas[i]);
             }
+            finaldfa=nfa.convertToDFA();
+            
+            // for (auto pair :tokens)
+            // {
+            //     RE* n= linear_reguex(pair.second);
+            //     n->type=pair.first;
+            //     NFA nfa= n->ConvertToNFA();
+            //     for(int fs:nfa.final_states)
+            //     {
+            //         nfa.m_final_token_types[fs]=pair.first;
+            //     }
+            //     nfas.push_back(nfa);
 
+            // }
+
+            // auto digitis_re=digits_reguex();
+            // NFA nfa_d=digitis_re->ConvertToNFA();
+            // for(int fs:nfa_d.final_states)
+            // {
+            //     nfa_d.m_final_token_types[fs]=Number;
+            // }
+            // nfas.push_back(nfa_d);
+
+            
+            
+
+            // auto identifier_re=buildIdentifierRE();
+            // NFA nfa_i=identifier_re->ConvertToNFA();
+            // for(int fs:nfa_i.final_states)
+            // {
+            //     nfa_i.m_final_token_types[fs]=Identifier;
+            // }
+            // nfas.push_back(nfa_i);
 
 
             
-            DFA dfa= nfa.convertToDFA();
-            finaldfa=dfa;
+            // DFA dfa= nfa.convertToDFA();
+            // finaldfa=dfa;
+            // DFA::save_binary(dfa);
             
                                     
         }
 
         
-        bool existAutamata(TokenType type)
-        {
-            std::string namefile=getStringOfToken(type);
-
-             if (!std::filesystem::exists("automatas")) return false;
-             if (!std::filesystem::exists("automatas/" + namefile ))  return false;
-             return true;
-
-        }
-
-        bool is_valid_token(TokenType type,std::string inp)
-        {
-            return automatas[type].evualuate(inp);
-        }
-        
-        RE* digits_reguex()
-        {
-           // RE* digit = unionOfSymbols("0123456789");
-            RE* digit = unionOfSymbols("0123456789");
+        // RE* digits_reguex()
+        // {
+        //    // RE* digit = unionOfSymbols("0123456789");
+        //     RE* digit = unionOfSymbols("0123456789");
            
-            RE* digits= new ConcatenationRE(digit,new ClousureRE(digit));
-            RE* opcfrac= new UnionRE(new ConcatenationRE(new SymbolRE('.'),digits),new EpsilonRE());
-            RE* number= new ConcatenationRE(digits,opcfrac);
-            return number;
-        }
+        //     RE* digits= new ConcatenationRE(digit,new ClousureRE(digit));
+        //     RE* opcfrac= new UnionRE(new ConcatenationRE(new SymbolRE('.'),digits),new EpsilonRE());
+        //     RE* number= new ConcatenationRE(digits,opcfrac);
+        //     return number;
+        // }
         
-        RE* linear_reguex(const std::string &s) 
-        {
+        // RE* linear_reguex(const std::string &s) 
+        // {
 
-            if (s.empty())
-                return new EpsilonRE(); 
+        //     if (s.empty())
+        //         return new EpsilonRE(); 
 
-            RE* currentRE = new SymbolRE(s[0]);
+        //     RE* currentRE = new SymbolRE(s[0]);
             
         
-            for (size_t i = 1; i < s.size(); ++i) {
-                currentRE = new ConcatenationRE(currentRE, new SymbolRE(s[i]));
-            }
+        //     for (size_t i = 1; i < s.size(); ++i) {
+        //         currentRE = new ConcatenationRE(currentRE, new SymbolRE(s[i]));
+        //     }
             
-            return currentRE;
-        }
+        //     return currentRE;
+        // }
 
    
-        RE* unionOfSymbols(const std::string &symbols) 
-        {
-            if (symbols.empty())
-                return nullptr; 
+        // RE* unionOfSymbols(const std::string &symbols) 
+        // {
+        //     if (symbols.empty())
+        //         return nullptr; 
 
-            RE* result = new SymbolRE(symbols[0]);
+        //     RE* result = new SymbolRE(symbols[0]);
             
             
-            for (size_t i = 1; i < symbols.size(); ++i) {
-                result = new UnionRE(result, new SymbolRE(symbols[i]));
-            }
-            return result;
-        }
+        //     for (size_t i = 1; i < symbols.size(); ++i) {
+        //         result = new UnionRE(result, new SymbolRE(symbols[i]));
+        //     }
+        //     return result;
+        // }
 
-        RE* buildIdentifierRE() 
-        {
+        // RE* buildIdentifierRE() 
+        // {
            
-            RE* firstChar = unionOfSymbols("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_");
-            //RE* firstChar = unionOfSymbols("af");
+        //     RE* firstChar = unionOfSymbols("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_");
+        //     //RE* firstChar = unionOfSymbols("af");
 
 
-            RE* subsequentChar = unionOfSymbols("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_");
-            //RE* subsequentChar = unionOfSymbols("af8");
+        //     RE* subsequentChar = unionOfSymbols("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_");
+        //     //RE* subsequentChar = unionOfSymbols("af8");
            
-            RE* subsequentStar = new ClousureRE(subsequentChar);
+        //     RE* subsequentStar = new ClousureRE(subsequentChar);
 
             
-            RE* identifierRE = new ConcatenationRE(firstChar, subsequentStar);
+        //     RE* identifierRE = new ConcatenationRE(firstChar, subsequentStar);
 
-            return identifierRE;
-        }
+        //     return identifierRE;
+        // }
 
         std::vector<Token> scanTokens(std::string inp)
         {
@@ -258,13 +323,27 @@ class Lexer
         {
            // std::pair<TokenType,int> matched={Error,-1};
 
-            int currentpos=cr;
+            size_t currentpos=cr;
             int currentState=finaldfa.start_state;
 
 
-            while(cr <inp.size())
+            bool firstC=false;
+
+
+            while(currentpos <inp.size())
             {
+                ////   x  function 
                 char n=inp[currentpos];
+                if(n=='"' and !firstC )  firstC=true;
+                else if(n=='"' and firstC)
+                {
+                    currentpos++;
+                    TokenType t=TokenType::String;
+                    return Token(inp.substr(cr,currentpos-cr),t,currentLine,currentCol);
+
+                    break;
+
+                }
                 int nextstate=finaldfa.nextState(n,currentState);
                 if (nextstate==-1)  break;
                 currentState=nextstate;

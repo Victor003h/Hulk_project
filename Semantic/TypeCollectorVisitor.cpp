@@ -11,7 +11,7 @@ class TypeCollectorVisitor: public Visitor
     void visit(ProgramNode* node)   override
      {
         context= new Context();
-        context->loadInternalType();
+        context->loadInternalTypeAndMethod();
         
         for(auto stmt : node->stmts)
         {

@@ -1,0 +1,110 @@
+// Nueva versión mejorada de la jerarquía de clases RE para facilitar
+// construcción desde un parser y mejorar eficiencia
+
+#include <memory>
+#include <set>
+#include <string>
+#include <map>
+#include <vector>
+#include <iostream>
+#include "NFA.hpp" // Asegúrate de incluir tu definición de NFA
+
+enum class REKind {
+    Empty, Epsilon, Symbol, Union, Concat, Clousure
+};
+
+class RE {
+public:
+    REKind kind;
+    std::set<char> alphabet;
+
+    RE(REKind kind, std::set<char> alphabet) : kind(kind), alphabet(std::move(alphabet)) {}
+    virtual ~RE() = default;
+
+    virtual bool is_valid(const std::string& inp) const = 0;
+    virtual NFA ConvertToNFA() const = 0;
+};
+
+using REPtr = std::shared_ptr<RE>;
+
+class EmptyRE : public RE {
+public:
+    EmptyRE() : RE(REKind::Empty, {}) {}
+    bool is_valid(const std::string& inp) const override {
+        return ConvertToNFA().evualuate(inp);
+    }
+    NFA ConvertToNFA() const override {
+        return NFA::emptyRE();
+    }
+};
+
+class EpsilonRE : public RE {
+public:
+    EpsilonRE() : RE(REKind::Epsilon, {'$'}) {}
+    bool is_valid(const std::string& inp) const override {
+        return ConvertToNFA().evualuate(inp);
+    }
+    NFA ConvertToNFA() const override {
+        return NFA::epsilonRE();
+    }
+};
+
+class SymbolRE : public RE {
+    char symbol;
+public:
+    SymbolRE(char symbol) : RE(REKind::Symbol, {symbol}), symbol(symbol) {}
+    bool is_valid(const std::string& inp) const override {
+        return ConvertToNFA().evualuate(inp);
+    }
+    NFA ConvertToNFA() const override {
+        return NFA::symbolRE(symbol);
+    }
+};
+
+class UnionRE : public RE {
+    REPtr left, right;
+public:
+    UnionRE(REPtr l, REPtr r) : RE(REKind::Union, l->alphabet) {
+        left = std::move(l);
+        right = std::move(r);
+        alphabet.insert(right->alphabet.begin(), right->alphabet.end());
+    }
+    bool is_valid(const std::string& inp) const override {
+        return ConvertToNFA().evualuate(inp);
+    }
+    NFA ConvertToNFA() const override {
+        return NFA::UnionRE(left->ConvertToNFA(), right->ConvertToNFA());
+    }
+};
+
+class ConcatRE : public RE {
+    REPtr left, right;
+public:
+    ConcatRE(REPtr l, REPtr r) : RE(REKind::Concat, l->alphabet) {
+        left = std::move(l);
+        right = std::move(r);
+        alphabet.insert(right->alphabet.begin(), right->alphabet.end());
+    }
+    bool is_valid(const std::string& inp) const override {
+        return ConvertToNFA().evualuate(inp);
+    }
+    NFA ConvertToNFA() const override {
+        return NFA::ConcatenationRE(left->ConvertToNFA(), right->ConvertToNFA());
+    }
+};
+
+class ClousureRE : public RE {
+    REPtr value;
+public:
+    ClousureRE(REPtr val) : RE(REKind::Clousure, val->alphabet), value(std::move(val)) {}
+    bool is_valid(const std::string& inp) const override {
+        return ConvertToNFA().evualuate(inp);
+    }
+    NFA ConvertToNFA() const override {
+        return NFA::ClousureRE(value->ConvertToNFA());
+    }
+};
+
+// Nota: usar std::shared_ptr permite compartir nodos entre expresiones y construir
+// estructuras recursivas con facilidad. Además se integra bien con el parser si produces
+// REPtr desde tus nodos del árbol.

@@ -24,6 +24,7 @@ class ParseNode
 };
 
 
+
 class ParseTree
 {
     public:
@@ -60,7 +61,6 @@ class ParseTree
         }
 }
 
-
 };
 
 
@@ -71,6 +71,7 @@ class ParseTreeVisitor
         virtual AstNode* visit(ParseNode* node)=0;
 
 };
+
 
 class AstBuilderVisitor: public ParseTreeVisitor
 {
@@ -169,6 +170,10 @@ class AstBuilderVisitor: public ParseTreeVisitor
                 Token id= node->m_children[1]->m_token;
                 auto [params,body]=MethodSignaturePrime(node->m_children[0]);
                 auto meth= new MethodNode(id,params,body);
+                if(!node->m_children[0]->m_children[1]->m_children.empty())
+            {
+                meth->type=node->m_children[0]->m_children[1]->m_children[0]->m_token.lexeme;
+            }
                 if(!(node->m_children[0]->m_children[1]->m_children.empty()))
                 {
                     meth->setType(node->m_children[0]->m_children[1]->m_children[0]->m_token.lexeme);
@@ -185,8 +190,11 @@ class AstBuilderVisitor: public ParseTreeVisitor
                 std::vector<AstNode*> parent_args;
                 if(!(node->m_children[3]->m_children.empty()))
                 {
-                    parentName= node->m_children[3]->m_children[3]->m_token;
-                    parent_args=ArgList(node->m_children[3]->m_children[1]);
+                    parentName= node->m_children[3]->m_children[1]->m_token;
+                    if(!node->m_children[3]->m_children[0]->m_children.empty())
+                    {
+                        parent_args=ArgList(node->m_children[3]->m_children[0]->m_children[1]);
+                    }
                 }
 
                 if(!(node->m_children[4]->m_children.empty()))
@@ -343,8 +351,14 @@ class AstBuilderVisitor: public ParseTreeVisitor
                 return {true,atr};   
             }
 
-            auto [params,body]=MethodSignaturePrime(node->m_children[1]->m_children[0]);
-            return {false,new MethodNode(id,params,body)};
+            auto signature=node->m_children[1]->m_children[0];
+            auto [params,body]=MethodSignaturePrime(signature);
+            auto met=new MethodNode(id,params,body);
+            if(!signature->m_children[1]->m_children.empty())
+            {
+                met->type=signature->m_children[1]->m_children[0]->m_token.lexeme;
+            }
+            return {false,met};
 
        }
 

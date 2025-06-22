@@ -1,5 +1,6 @@
 
-#include "lexer.cpp"
+//#include "lexer.cpp"
+#include "regexParser.cpp"
 
 int main()
 {
@@ -57,28 +58,51 @@ int main()
         {TokenType::punc_Dot,          "."}        // ("dot", ".")
     };
 
+    std::vector<std::string> patterns = {
+       "\\\"([^\\\"\\\\]|\\\\.)*\\\"" , "[a-zA-Z]+[a-zA-Z0-9_]*", "colou?r", "(ab|cd)+e?"
+    };
 
-    ErrorHandler error;
 
-    Lexer lexer(error);
 
-    std::string inp=" 5 < 34 or 23.3 <= 4  ";
-    std::string inp2=R"(42;
-    print(42);
-    print((((1 + 2) ^ 3) * 4) / 5);
-    print("Hello World");
-    print("The message is \\"Hello World\\"");
-    print("The meaning of life is " @ 42);
-    print(sin(2 * PI) ^ 2 + cos(3 * PI / log(4, 64)));)";
+    auto pat=patterns[0];
+
+    RegexParser p(pat);
+    auto re = p.parse();
+    NFA n=re->ConvertToNFA();
+    DFA d=n.convertToDFA();
+
+    
+    auto valid=d.evualuate( " identido");
+
+    std::cout<<valid;
+    
+   
+
+
+
+
+
+    // ErrorHandler error;
+
+    // Lexer lexer(error);
+
+    // std::string inp=" 5 < 34 or 23.3 <= 4  ";
+    // std::string inp2=R"(42;
+    // print(42);
+    // print((((1 + 2) ^ 3) * 4) / 5);
+    // print("Hello World");
+    // print("The message is \\"Hello World\\"");
+    // print("The meaning of life is " @ 42);
+    // print(sin(2 * PI) ^ 2 + cos(3 * PI / log(4, 64)));)";
 
 
     
-     auto toks=lexer.scanTokens(inp);
+    //  auto toks=lexer.scanTokens(inp);
 
-     for (auto tok: toks)
-     {
-        std::cout<<tok.to_string()<<std::endl;
-     }
+    //  for (auto tok: toks)
+    //  {
+    //     std::cout<<tok.to_string()<<std::endl;
+    //  }
  
 }
    

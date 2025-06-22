@@ -9,12 +9,11 @@ class Parser
         
 
     public:
-        Parser( ErrorHandler& errorHandler):errorHandler(errorHandler)
+        Parser( ErrorHandler& errorHandler,std::string filegrammar="grammar.txt"):errorHandler(errorHandler)
         {
-            m_grammar= Grammar::loadGrammar("grammar.txt");;
+            m_grammar= Grammar::loadGrammar(filegrammar);;
             errorHandler=m_grammar.errorHandler;
 
-    
         }
 
         ParseTree* parse(std::vector<Token> tokens)

@@ -215,7 +215,7 @@ public:
     AstNode* right;
 
     BinaryExpression(AstNode* left, Token op, AstNode* right)
-        : left(left), op(op), right(right) {}
+        : left(left), op(op), right(right) {type="Number";}
 
     void print(int indent = 0) const override {
         std::string spacing(indent, ' ');

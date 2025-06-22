@@ -9,6 +9,19 @@
 
 using namespace std;
 
+struct Transition
+{
+    char character;
+    std::vector<int> to;
+
+    std::string type;
+
+    Transition(char c,std::vector<int> to,std::string t)
+    :character(c),to(to),type(t){}
+
+};
+
+
 
 class DFA
 {
@@ -17,12 +30,12 @@ class DFA
         int total_states;
         std::vector<int> final_states;
         std::set<char> alphabet;
-        std::map<int, std::map<char, int>> transitions;
+        std::map<int, std::vector<Transition>> transitions;
         std::map<int, TokenType> m_final_token_types;
 
   
     public: DFA(int start_state,int total_states,std::vector<int> final_states,
-            std::set<char>alphabet,std::map<int, std::map<char, int >> transitions)
+            std::set<char>alphabet,std::map<int, std::vector<Transition>> transitions)
         {
             this->total_states=total_states;
             this->start_state=start_state;
@@ -38,16 +51,20 @@ class DFA
             return start_state;
         }
        
-        int nextState(char l,int current_state)
+       
+        int nextState(char c, int state) 
         {
-
-            if (!is_valid(l)) return -1;
+           
             
-            if(transitions[current_state].find(l)==transitions[current_state].end())   return -1;
-
-            auto trs=transitions[current_state][l];
-            
-            return trs;
+            auto tr=transitions.at(state);
+            std::vector<int> states={};
+            for (auto t:tr)
+            {
+                if(t.character==c || t.type=="any") 
+                    return t.to[0];
+                
+            }
+            return -1;
         }
         
         bool is_valid(const char symbol)
@@ -80,109 +97,87 @@ class DFA
             return is_final_state(current_state);
         }
         
-
-        void saveToFile(const std::string& file) const {
-            
-            const std::string folder="automatas";
-
-            if (!std::filesystem::exists(folder)) 
-            {
-                std::filesystem::create_directory(folder);
-            }
-
-            std::string filename=folder+"/"+ file;
-
-            std::ofstream ofs(filename);
-            if (!ofs) {
-                std::cerr << "Error al abrir el archivo " << filename << " para escribir." << std::endl;
-                return;
-            }
-            // Guardamos los datos en un formato sencillo:
-            ofs << start_state << "\n" 
-                << total_states << "\n";
-            
-            // Escribir los estados finales
-            ofs << final_states.size() << "\n";
-            for (const auto& state : final_states)
-                ofs << state << " ";
-            ofs << "\n";
-            
-            // Escribir el alfabeto
-            ofs << alphabet.size() << "\n";
-            for (const auto& c : alphabet)
-                ofs << c << " ";
-            ofs << "\n";
-            
-            // Escribir las transiciones
-            ofs << transitions.size() << "\n";
-            // Para cada estado con transiciones
-            for (const auto &entry : transitions) {
-                ofs << entry.first << " " << entry.second.size() << "\n";
-                // Cada transición: carácter y estado destino
-                for (const auto &inner : entry.second) {
-                    ofs << inner.first << " " << inner.second << " ";
-                }
-                ofs << "\n";
-            }
-            ofs.close();
+        static bool existsDfa()
+        {
+            return std::filesystem::exists("dfa.bin");
         }
-    
-    
-        static DFA* loadFromFile(const std::string& file) {
+       
 
-            const std::string folder="automatas/";
-            
-            std::string filename=folder+file;
-            
+    //     static void save_binary(const DFA& dfa, const std::string& filename="dfa.bin") {
+    //     std::ofstream out(filename, std::ios::binary);
 
-            std::ifstream ifs(filename);
-            if (!ifs) {
-                std::cerr << "No se pudo abrir el archivo " << filename << " para cargar." << std::endl;
-                return nullptr;
-            }
-            int st, total;
-            ifs >> st >> total;
-            
-            // Cargar los estados finales
-            size_t numFinals;
-            ifs >> numFinals;
-            std::vector<int> finals(numFinals);
-            for (size_t i = 0; i < numFinals; ++i) {
-                ifs >> finals[i];
-            }
-            
-            // Cargar el alfabeto
-            size_t numAlph;
-            ifs >> numAlph;
-            std::set<char> alph;
-            for (size_t i = 0; i < numAlph; ++i) {
-                char c;
-                ifs >> c;
-                alph.insert(c);
-            }
-            
-            // Cargar las transiciones
-            size_t numTrans;
-            ifs >> numTrans;
-            std::map<int, std::map<char, int>> trans;
-            for (size_t i = 0; i < numTrans; ++i) {
-                int state;
-                size_t innerCount;
-                ifs >> state >> innerCount;
-                std::map<char, int> innerMap;
-                for (size_t j = 0; j < innerCount; ++j) {
-                    char transChar;
-                    int nextState;
-                    ifs >> transChar >> nextState;
-                    innerMap[transChar] = nextState;
-                }
-                trans[state] = innerMap;
-            }
-            ifs.close();
-            return new DFA(st, total, finals, alph, trans);
-        }
+    //     out.write(reinterpret_cast<const char*>(&dfa.start_state), sizeof(int));
+    //     out.write(reinterpret_cast<const char*>(&dfa.total_states), sizeof(int));
+
+    //     int final_size = dfa.final_states.size();
+    //     out.write(reinterpret_cast<const char*>(&final_size), sizeof(int));
+    //     for (int f : dfa.final_states) {
+    //         out.write(reinterpret_cast<const char*>(&f), sizeof(int));
+    //     }
+
+    //     int alphabet_size = dfa.alphabet.size();
+    //     out.write(reinterpret_cast<const char*>(&alphabet_size), sizeof(int));
+    //     for (char c : dfa.alphabet) {
+    //         out.write(&c, sizeof(char));
+    //     }
+
+    //     int num_states = dfa.transitions.size();
+    //     out.write(reinterpret_cast<const char*>(&num_states), sizeof(int));
+    //     for (const auto& [state, map] : dfa.transitions) {
+    //         out.write(reinterpret_cast<const char*>(&state), sizeof(int));
+    //         int num_transitions = map.size();
+    //         out.write(reinterpret_cast<const char*>(&num_transitions), sizeof(int));
+    //         for (const auto& [symbol, next] : map) {
+    //             out.write(&symbol, sizeof(char));
+    //             out.write(reinterpret_cast<const char*>(&next), sizeof(int));
+    //         }
+    //     }
+    // }
+
+    //     static DFA load_binary(const std::string& filename="dfa.bin")
+    //     {
+    //         std::ifstream in(filename, std::ios::binary);
+    //         DFA dfa;
+
+    //         in.read(reinterpret_cast<char*>(&dfa.start_state), sizeof(int));
+    //         in.read(reinterpret_cast<char*>(&dfa.total_states), sizeof(int));
+
+    //         int final_size;
+    //         in.read(reinterpret_cast<char*>(&final_size), sizeof(int));
+    //         dfa.final_states.resize(final_size);
+    //         for (int& f : dfa.final_states) {
+    //             in.read(reinterpret_cast<char*>(&f), sizeof(int));
+    //         }
+
+    //         int alphabet_size;
+    //         in.read(reinterpret_cast<char*>(&alphabet_size), sizeof(int));
+    //         for (int i = 0; i < alphabet_size; ++i) {
+    //             char c;
+    //             in.read(&c, sizeof(char));
+    //             dfa.alphabet.insert(c);
+    //         }
+
+    //         int num_states;
+    //         in.read(reinterpret_cast<char*>(&num_states), sizeof(int));
+    //         for (int i = 0; i < num_states; ++i) {
+    //             int state;
+    //             in.read(reinterpret_cast<char*>(&state), sizeof(int));
+    //             int num_transitions;
+    //             in.read(reinterpret_cast<char*>(&num_transitions), sizeof(int));
+    //             for (int j = 0; j < num_transitions; ++j) {
+    //                 char sym;
+    //                 int dest;
+    //                 in.read(&sym, sizeof(char));
+    //                 in.read(reinterpret_cast<char*>(&dest), sizeof(int));
+    //                 dfa.transitions[state][sym] = dest;
+    //             }
+    //         }
+
+    //         return dfa;
+    // }
 
 };
+ 
 
 
 class NFA{
@@ -191,19 +186,21 @@ class NFA{
         int start_state;
         int total_states;
         std::set<char> alphabet;
-        std::map<int, std::map<char, std::vector<int>>> transitions;       
+        std::map<int, std::vector<Transition>> transitions;       
         std::vector<int> final_states;
         std::map<int, TokenType> m_final_token_types;
     
     public:
         NFA(int start_state,int total_states,std::vector<int> final_states,
-            std::set<char>alphabet,std::map<int, std::map<char, std::vector<int> >> transitions)
+            std::set<char>alphabet,std::map<int, std::vector<Transition>> transitions)
         {
             this->total_states=total_states;
             this->start_state=start_state;
             this->final_states=final_states;
             this->alphabet=alphabet;
             this->transitions=transitions;
+
+           
         }
         
 
@@ -215,26 +212,29 @@ class NFA{
             return false;
         }
 
-        std::vector<int> epsilonTransitions(int state)
+        std::pair<std::vector<int>,bool> epsilonTransitions(int state) const 
         {
-            if(transitions[state].find('$')==transitions[state].end())   return {};
-            return transitions[state]['$'];
+            return nextStates('$',state,false);
         }
+
         
-        std::vector<int> nextStates(char l,int current_state)
-        {
-
-
-            if (!is_valid(l)) return {};
-            //std::vector<int> res=epsilonTransitions(current_state);
-            
-            if(transitions[current_state].find(l)==transitions[current_state].end())   return {};
-
-            
-            auto trs=transitions[current_state][l];
-            //for (int e : trs)   res.push_back(e);
-            
-            return trs;
+       std::pair<std::vector<int>,bool> nextStates(char c, int state,bool useAny) const 
+       {
+            if(transitions.find(state)==transitions.end())  return{{},false};
+            auto tr=transitions.at(state);
+            std::vector<int> states={};
+            bool any=false;
+            for (auto t:tr)
+            {
+                if(t.character==c || (useAny &&  t.type=="any")) 
+                {
+                    if(t.type=="any")   any=true;
+                     states.insert(states.end(), t.to.begin(), t.to.end());
+                }
+                
+                
+            }
+            return {states,any};
         }
         
         bool is_valid(const char symbol)
@@ -250,29 +250,24 @@ class NFA{
         bool evualuate(std::string input)
         {
             std::vector<int> cs={start_state};
-
             for(char symbol :input)
             {
                 std::vector<int> aux={};
 
                 for (size_t i=0;i<cs.size();i++)
                 {
-
-                    auto eps=eClousure(cs[i],false);
+                    auto [eps,_]=eClousure(cs[i],false);
                     for(int i:eps) cs.push_back(i);
 
-                    auto s=nextStates(symbol,cs[i]);
-                    for(int i:s) aux.push_back(i); 
+                    auto s=nextStates(symbol,cs[i],true);
+                    for(int i:s.first) aux.push_back(i); 
                 }
                 cs=aux;
             }
 
-
-
-
            for (size_t i=0;i<cs.size();i++)
             {
-                auto eps=eClousure(cs[i],false);
+                auto [eps,_]=eClousure(cs[i],false);
                 for(int i:eps) cs.push_back(i);
 
                 if(is_final_state(cs[i]))    return true;
@@ -281,28 +276,24 @@ class NFA{
          }
 
         
-
         DFA convertToDFA()
         {
             std::map<std::set<int>,int> dfn_states={};
             std::queue<std::set<int>> queue={};
-            std::map<int, std::map<char, int>> trs={};
-
-            
+            std::map<int, std::vector<Transition>> trs={};
             int cr=0;
-            auto start=eClousure_set({start_state});
+            auto [start,a]=eClousure_set({start_state});
             queue.push(start);
             dfn_states[start]=cr;
             cr++;
-
             while (!queue.empty())
             {
-
                 std::set<int> T=queue.front();
                 for (char sym:alphabet)
                 {
-                    if (sym=='$') continue;
-                    auto u=eClousure_set(move(T,sym));
+                    if (sym=='$' ||sym=='~') continue;
+                    auto [moveSet,useAny]=move(T,sym);
+                    auto [u,useAnyE]=eClousure_set(moveSet);
                     if(dfn_states.find(u)==dfn_states.end())
                     {
                         if (u.size()==0)    dfn_states[u]=-1;
@@ -313,7 +304,16 @@ class NFA{
                         
                         queue.push(u);
                     }
-                    trs[dfn_states[T]][sym]=dfn_states[u];
+
+                    if(trs.find(dfn_states[T])==trs.end())  trs[dfn_states[T]]={};
+                    if(!useAny )
+                        trs[dfn_states[T]].push_back(Transition(sym,{dfn_states[u]},"normal"));
+                    else
+                    {
+                        trs[dfn_states[T]].push_back(Transition(sym,{dfn_states[u]},"any"));
+                        break;
+                    }
+                    
                 }
                 queue.pop();
             }
@@ -348,18 +348,16 @@ class NFA{
             DFA dfa(0,dfn_states.size(),finalStates,alphabet,trs);
             dfa.m_final_token_types=dfa_final_tokens;
             return dfa;
-
         }
         
-        
 
-        std::set<int> eClousure(int state,bool initial)
+        std::pair<std::set<int>,bool> eClousure(int state,bool initial)
         {
             std::set<int> res={};
             std::queue<int> pending={};
             pending.push(state);
             
-
+            bool any=false;
             while(!pending.empty())
             {
                 int cr=pending.front();
@@ -367,8 +365,9 @@ class NFA{
 
                 if(res.find(cr)!=res.end()) continue;
 
-                auto r=transitions[cr]['$'];
-                for(int i:r)    
+                auto [epst,useAny]=epsilonTransitions(cr);
+                if(!any)    any=useAny;
+                for(int i:epst)    
                 {
                     pending.push(i);
                 }
@@ -376,37 +375,41 @@ class NFA{
                 res.insert(cr);
 
             }
-            return res;
+            return {res,any};
 
         }
        
-        std::set<int> move(std::set<int>set,char symbol)
+        std::pair<std::set<int>,bool> move(std::set<int>set,char symbol)
         {
             std::set<int> res={};
 
+            bool use_any=false;
             for (int state: set)
             {
-                auto s=transitions[state][symbol];
+                auto [s,any]=nextStates(symbol,state,true);
+                if(!use_any)    use_any=any;
                 for (int i :s){
                     res.insert(i);
                 }
             }
-            return res;
+            return {res,use_any};
         }
         
-        std::set<int>eClousure_set(std::set<int> set)
+        std::pair<std::set<int>,bool>   eClousure_set(std::set<int> set)
         {
             std::set<int> res={};
+            bool any=false;
             for (int st: set)
             {
-                auto eclo=eClousure(st,true);
+                auto [eclo,useany]=eClousure(st,true);
+                if(!any)    any=useany;
                 for (int i : eclo)
                 {
                     res.insert(i);
                 }
 
             }
-            return res;
+            return {res,any};
         }
     
     
@@ -418,17 +421,45 @@ class NFA{
        
         static NFA epsilonRE()
         {
-            std::map<int,std::map<char,std::vector<int>>> tras={};
-            tras[0]['$']={1};
+            std::map<int,std::vector<Transition>> tras={};
+            tras[0]={Transition('$',{1},"epsilon")};
             return NFA(0,2,{1},{'$'},tras);
         }
-
-        static NFA symbolRE(char symbol)
+        
+        static NFA anyRE()
         {
-            std::map<int,std::map<char,std::vector<int>>> tras={};
-            tras[0][symbol]={1};
-            return NFA(0,2,{1},{symbol},tras);
+            std::map<int,std::vector<Transition>> tras={};
+            tras[0]={Transition('~',{1},"any")};
+            return NFA(0,2,{1},{'~'},tras);
         }
+
+        static NFA symbolRE(char symbol) 
+        {
+            std::map<int,std::vector<Transition>> tras;
+            tras[0]={Transition(symbol,{1},"normal")};
+            std::set<char> alphabet{symbol};
+            return NFA(0, 2, {1}, alphabet, tras);
+        }
+
+        static NFA RangeRE(char from,char to)
+        {
+          
+            int start = 0;
+            int end = to-from+2;
+            std::set<char> alpha={};
+            std::map<int,std::vector<Transition>> t={};
+            int state=1;
+            for (char c = from; c <= to; ++c,state++)
+            {
+                alpha.insert(c);
+                t[start].push_back(Transition(c,{state},"normal"));
+                t[state].push_back(Transition('$',{end},"epsilon"));
+
+            } 
+            return NFA(start,to-from+3,{end},alpha,t);
+        }
+
+
 
         static  NFA UnionRE(NFA a1,NFA a2)
         {
@@ -439,20 +470,20 @@ class NFA{
             std::set<char> alphabet=a1.alphabet;
             alphabet.merge(a2.alphabet);
 
-            std::map<int, std::map<char, std::vector<int>>> transitions={};
-            transitions=a1.transitions;
-            for (auto value: a2.transitions)
+            std::map<int, std::vector<Transition>> final_transitions={};
+            final_transitions=a1.transitions;
+            for (auto [state,transition]: a2.transitions)
             {
-               int new_state=value.first+a1.total_states;
-               for (auto value2: value.second)
+               int new_state=state+a1.total_states;
+               for (auto t: transition)
                {
-                    std::vector<int> new_states=value2.second;
-                    for(size_t i=0 ;i<new_states.size();i++)
+                    auto new_T=t;
+                    for (size_t i = 0; i < new_T.to.size(); i++)
                     {
-                        new_states[i]+=a1.total_states;
+                         new_T.to[i]+=a1.total_states;
                     }
-                    transitions[new_state][value2.first]=new_states;
-
+                    
+                    final_transitions[new_state].push_back(new_T);
                }
             }
 
@@ -460,7 +491,8 @@ class NFA{
             {
                 alphabet.insert('$');
             }
-            transitions[startstate]['$']={a1.start_state,a2.start_state+a1.total_states};
+
+            final_transitions[startstate]= { Transition( '$',{a1.start_state,a2.start_state+a1.total_states},"epsilon")};
 
             auto final_token_types=a1.m_final_token_types;
             for (auto pair: a2.m_final_token_types)
@@ -468,26 +500,17 @@ class NFA{
                 final_token_types[pair.first+a1.total_states]=pair.second;
             }
 
-            
-            // for (int fs: a1.final_states)
-            // {
-            //     transitions[fs]['$']={final_s};
-            // }
-            // for (int fs: a2.final_states)
-            // {
-            //     transitions[fs+a1.total_states]['$']={final_s};
-            // }
-
             for (int fs: a2.final_states)
             {
                 finals.push_back(fs+a1.total_states);
             }
             
-            NFA res(startstate,totalstates,finals,alphabet,transitions);
+            NFA res(startstate,totalstates,finals,alphabet,final_transitions);
             res.m_final_token_types=final_token_types;
             return res;
         }
     
+
         static NFA ConcatenationRE(NFA a1,NFA a2)
         {
             int startstate= a1.start_state;
@@ -502,20 +525,20 @@ class NFA{
                 final_states.push_back(fs+a1.total_states);
             }
 
-            std::map<int, std::map<char, std::vector<int>>> transitions={};
-            transitions=a1.transitions;
+            std::map<int, std::vector<Transition>> final_transitions={};
+            final_transitions=a1.transitions;
 
-            for (auto value: a2.transitions)
+            for (auto [state,a2_transitions]: a2.transitions)
             {
-               int new_state=value.first+a1.total_states;
-               for (auto value2: value.second)
+               int new_state=state+a1.total_states;
+               for (auto a2_t: a2_transitions)
                {
-                    std::vector<int> new_states=value2.second;
-                    for(size_t i=0 ;i<new_states.size();i++)
+                    auto  new_T=a2_t;
+                    for (size_t i = 0; i < new_T.to.size(); i++)
                     {
-                        new_states[i]+=a1.total_states;
-                    }
-                    transitions[new_state][value2.first]=new_states;
+                         new_T.to[i]+=a1.total_states;
+                    }   
+                    final_transitions[new_state].push_back(new_T);
                }
             }
             if(alphabet.find('$')==alphabet.end())
@@ -524,10 +547,10 @@ class NFA{
             }
             for (int fs:a1.final_states)
             {
-                transitions[fs]['$']={a2.start_state+a1.total_states};
+                final_transitions[fs]={Transition('$',{a2.start_state+a1.total_states},"epsilon")};
             }
 
-            return NFA(startstate,totalstates,final_states,alphabet,transitions);
+            return NFA(startstate,totalstates,final_states,alphabet,final_transitions);
             
         }
     
@@ -549,15 +572,20 @@ class NFA{
 
             for (int fs : a1.final_states)
             {
-                transitions[fs]['$']={a1.start_state,finalstate};
+                transitions[fs]={Transition('$',{a1.start_state,finalstate},"epsilon")};
             }
-            transitions[startstate]['$']={finalstate,a1.start_state};
+            transitions[startstate]={Transition('$',{a1.start_state,finalstate},"epsilon")};
 
             return NFA(startstate,totalStates,{finalstate},alphabet,transitions);
 
         }
     
+
+
     };
     
+
+
+
 
 

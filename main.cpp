@@ -7,9 +7,10 @@
 #include "./Semantic/SemanticAnalizer.cpp"
 #include "./CodeGen/CodeGenerationContext.hpp"
 
-
 int main() {
-   
+
+// 
+
     std::string inputFile = "script.hulk";  // Usa uno fijo o por argv
     std::ifstream file(inputFile);
     if (!file.is_open()) {
@@ -20,7 +21,7 @@ int main() {
     buffer <<file.rdbuf();
     std::string input=buffer.str();
     
-
+  
     ErrorHandler error;
     Lexer lexer(error);
     auto tokens=lexer.scanTokens(input);

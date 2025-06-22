@@ -5,13 +5,14 @@
 class VariableDefindedVisitor:public Visitor
 {
 
-       public:
+    public:
 
         Context* context;
         Type* currentType=nullptr;
+        bool comingFromLet=false;
         ErrorHandler errorHandler;
 
-         VariableDefindedVisitor(Context* context,ErrorHandler& errorHandler)
+        VariableDefindedVisitor(Context* context,ErrorHandler& errorHandler)
         :context(context),errorHandler(errorHandler){}
 
         void visit(ProgramNode* node)   override
@@ -21,8 +22,8 @@ class VariableDefindedVisitor:public Visitor
                 stmt->accept(*this);
             }
         }
-       
-    
+        
+        
         void visit(TypeNode* node)  override
         {
         
@@ -33,25 +34,22 @@ class VariableDefindedVisitor:public Visitor
                 return;
             }
             
-           auto lastType=currentType;
+            auto lastType=currentType;
 
-           context=context->createChildContext();
+            context=context->createChildContext();
 
-           Type* parent=context->GetType("Object");
-            
-           if(node->parentName.lexeme!="")
-           {
-
+            Type* parent=context->GetType("Object");
+            if(node->parentName.lexeme!="")
+            {
                 for(auto tp:context->INTERNAL_TYPES)
                 {
                     if(tp==node->parentName.lexeme)
                     {
-                        std::string msg="Can't inherit" +node->name.lexeme + "from a basic type like [Number, String, Vector, Node, Boolean] ";
+                        std::string msg="Can't inherit" +node->name.lexeme + "from a basic type like "+tp;
                         errorHandler.reportError(node->parentName,msg);
                         return;
                     }
                 }
-
 
                 if(!context->exist_Type(node->parentName.lexeme))
                 {
@@ -59,22 +57,17 @@ class VariableDefindedVisitor:public Visitor
                     errorHandler.reportError(node->parentName,msg);
                     return;
                 }
+               
                 parent= context->GetType(node->parentName.lexeme);
 
-                if(node->parent_args.size()!= parent->atributes.size())
-                {
-                    std::string msg="Invalid value of arguments";
-                    errorHandler.reportError(node->parentName,msg);
-                    return;
-                }
-                
-           }
-
+            }
+          
             currentType=context->CreateType(node->name.lexeme);
             currentType->parent=parent;
-
+            bool hasArg=false;
             for(auto arg:node->args)
             {
+                hasArg=true;
                 auto id= static_cast<IdentifierNode*>(arg);
                 context->Define_local_Atribute(id->value.lexeme,id->getType());
                 if(currentType->exist_Argument(id->value.lexeme))
@@ -86,6 +79,55 @@ class VariableDefindedVisitor:public Visitor
                 currentType->DefineArgument(id->value.lexeme,id->type);
             }
 
+            if(node->parentName.lexeme!="")
+            {  
+                if(hasArg)
+                {
+                    auto currentp=parent;
+                    bool found=false;
+                    while(true)
+                    {
+                        if( currentp->arguments.size()==0)
+                        {
+                            if(currentp->parent->name=="Object")
+                            {
+                                if(node->parent_args.size()==0) break;
+                                std::string msg="Parent receive invalid number of arguments";
+                                errorHandler.reportError(node->name,msg);
+                                return;
+                            }
+
+                            currentp=currentp->parent;
+                            continue;
+                        }
+
+                        if(node->parent_args.size()!=currentp->arguments.size())
+                        {
+                            std::string msg="Parent receive invalid number of arguments";
+                            errorHandler.reportError(node->name,msg);
+                            return;
+                        }
+
+                        for(auto atr:node->parent_args) 
+                            atr->accept(*this);
+                        
+                        break;
+                    }
+                }
+              
+                else
+                {
+                    auto currentp=parent;
+                    while(currentp->parent->name!="Object" && currentp->arguments.size()==0)
+                    {
+                        currentp=currentp->parent;
+                    }
+                    currentType->parentInstantiation=currentp->name;
+                }
+            }
+
+      
+            
             
             for(auto atribute : node->atributes)
             {
@@ -111,6 +153,7 @@ class VariableDefindedVisitor:public Visitor
             temp->arguments=currentType->arguments;
             temp->atributes=currentType->atributes;
             temp->methods=currentType->methods;
+            temp->parentInstantiation=currentType->parentInstantiation;
             currentType=lastType;
 
         };
@@ -118,11 +161,11 @@ class VariableDefindedVisitor:public Visitor
         void visit(AtributeNode* node)
         {
            
-            if(  currentType!=nullptr )
+            if(  currentType!=nullptr &&!comingFromLet )
             {
                 if(currentType->exist_Atribute(node->id.lexeme))
                 {
-                    std::string msg="The atribute name"+ node->id.lexeme+" already exists in this type";
+                    std::string msg="The atribute name "+ node->id.lexeme+" already exists in this type";
                     errorHandler.reportError(node->id,msg);
                     return;
                 }
@@ -217,13 +260,13 @@ class VariableDefindedVisitor:public Visitor
         void visit(LetExpression* node)
         {
             context= context->createChildContext();
-
+            comingFromLet=true;
             for (auto decl: node->assignments)
             {
                 decl->accept(*this);
             }
             node->body->accept(*this);
-
+            comingFromLet=false;
            // node->type=node->body->getType();
 
             context=context->RemoveContext();
@@ -242,6 +285,7 @@ class VariableDefindedVisitor:public Visitor
         {
             node->left->accept(*this);
             node->right->accept(*this);
+            
             //std::set<std::string> boolop={"<","<=",">",">=","==","!="};
            // std::set<std::string> aritop={"+","-","/","*","^","%"};
 
@@ -284,7 +328,7 @@ class VariableDefindedVisitor:public Visitor
 
             if(!context->exist_Atribute(node->value.lexeme))
             {
-                std::string msg="The name"+ node->value.lexeme+ " does not exists";
+                std::string msg="The name "+ node->value.lexeme+ " does not exists";
                 errorHandler.reportError(node->value,msg);
                 return;
             }
@@ -294,9 +338,7 @@ class VariableDefindedVisitor:public Visitor
 
         }; 
 
-         
-       
-       
+          
         void visit(IfExpression* node)       
         {
             std::vector<std::string> exp_types;
@@ -333,21 +375,20 @@ class VariableDefindedVisitor:public Visitor
         };
         
        
-     
         void visit(FunCallNode* node) 
         {
             
             Method* meth=nullptr;
             if(currentType!=nullptr)
+            {
+                meth=currentType->GetMethod(node->id.lexeme);
+                if(!meth)
                 {
-                    meth=currentType->GetMethod(node->id.lexeme);
-                    if(!meth)
-                    {
-                        std::string msg="The function "+ node->id.lexeme+ " is not defined";
-                        errorHandler.reportError(node->id,msg);
-                        return;
-                    }
+                    std::string msg="The function "+ node->id.lexeme+ " is not defined";
+                    errorHandler.reportError(node->id,msg);
+                    return;
                 }
+            }
 
            else
            {
@@ -359,7 +400,6 @@ class VariableDefindedVisitor:public Visitor
             }
     
             meth=context->GetMethod(node->id.lexeme);
-
 
            }
 
@@ -382,66 +422,80 @@ class VariableDefindedVisitor:public Visitor
                 //     return;
                 // }
             }
+            node->type=meth->m_returnType;
+
         };
 
-    void visit(MemberCall* node) 
-    {
-        // Primero resolvemos obj
-        node->obj->accept(*this);
-
-        // Obtener el tipo del objeto base
-        Type* objType = context->GetType(node->obj->getType());
-
-        if (!objType) 
+        void visit(MemberCall* node) 
         {
-            std::string msg = "Unknown type for object in member call.";
-            errorHandler.reportError(0, 0, msg);
-            return;
-        }
+            // Primero resolvemos obj
+            node->obj->accept(*this);
 
+            // Obtener el tipo del objeto base
+            Type* objType = context->GetType(node->obj->getType());
 
-
-        if (auto id = dynamic_cast<IdentifierNode*>(node->member)) 
-        {
-            // Atributo
-            if (currentType == nullptr || currentType->name!= objType->name) 
+            if (!objType) 
             {
-                std::string msg = "Attributes of '" + objType->name + "' can only be accessed from within the class using 'self'";
+                std::string msg = "Unknown type for object in member call.";
                 errorHandler.reportError(0, 0, msg);
                 return;
             }
 
-            if (!objType->exist_Atribute(id->value.lexeme)) {
-                std::string msg = "The name '" + id->value.lexeme + "' is not an attribute of type " + objType->name;
-                errorHandler.reportError(id->value, msg);
-                return;
-            }
-            id->type=objType->atributes[id->value.lexeme]->type;
-            node->type = id->type;
-        } 
-        else if (auto meth = dynamic_cast<FunCallNode*>(node->member)) 
-        {
-            if (!objType->exist_Method(meth->id.lexeme)) 
+            if (auto id = dynamic_cast<IdentifierNode*>(node->member)) 
             {
-                std::string msg = "The type " + objType->name + " has no method named " + meth->id.lexeme + "'";
-                errorHandler.reportError(meth->id, msg);
-                return;
+                // Atributo
+                if (currentType == nullptr || currentType->name!= objType->name) 
+                {
+                    std::string msg = "Attributes of '" + objType->name + "' can only be accessed from within the class using 'self'";
+                    errorHandler.reportError(0, 0, msg);
+                    return;
+                }
+
+                if (!objType->exist_Atribute(id->value.lexeme)) {
+                    std::string msg = "The name '" + id->value.lexeme + "' is not an attribute of type " + objType->name;
+                    errorHandler.reportError(id->value, msg);
+                    return;
+                }
+                id->type=objType->atributes[id->value.lexeme]->type;
+                node->type = id->type;
             }
 
-            auto lastType=currentType;
-            currentType=objType;
-            meth->accept(*this);
-            currentType=lastType;
-            // Seteamos el tipo resultante
-            node->type = meth->getType();
-        } 
-        else 
-        {
-            std::string msg = "Invalid member access.";
-            errorHandler.reportError(0, 0, msg);
-        }
+            else if (auto meth = dynamic_cast<FunCallNode*>(node->member)) 
+            {
+                auto current=objType;
+                bool found=false;
+                while(current->name!="Object")
+                {
+                    if (!current->exist_Method(meth->id.lexeme)) 
+                    {
+                        current=current->parent;
+                        continue;
+                    }
+                    found=true;
+                    break;
+                }
+                if(!found)
+                {
+                    std::string msg = "The type " + objType->name + " has no method named " + meth->id.lexeme + "'";
+                    errorHandler.reportError(meth->id, msg);
+                    return;
+                }
 
-    }
+
+                auto lastType=currentType;
+                currentType=current;
+                meth->accept(*this);
+                currentType=lastType;
+                // Seteamos el tipo resultante
+                node->type = meth->getType();
+
+            } 
+            else 
+            {
+                std::string msg = "Invalid member access.";
+                errorHandler.reportError(0, 0, msg);
+            }
+        }
 
 
         void visit(DestructiveAssignNode* node) 
@@ -460,32 +514,35 @@ class VariableDefindedVisitor:public Visitor
                 return;
             }
 
-            Type* type= context->GetType(node->typeName.lexeme);
-            Type* parent=type->parent;
+            Type* typeInst= context->GetType(node->typeName.lexeme);
+           
         
-            
-            if(parent->name!="Object")
-               
-            if(node->arguments.size()!=type->arguments.size())
+            std::string parentInst=typeInst->parentInstantiation;
+        
+        
+            if(!parentInst.empty())
             {
-                std::string msg="Invalid number of arguments , must receive "+ type->arguments.size();
-                errorHandler.reportError(node->typeName,msg);
-                return;
-
+                typeInst=context->GetType(parentInst); 
             }
 
+
+            if(node->arguments.size()!=typeInst->arguments.size())
+            {
+                std::string msg="Invalid number of arguments , must receive "+ typeInst->arguments.size();
+                errorHandler.reportError(node->typeName,msg);
+                return;
+            }
+            
             for (size_t i = 0; i < node->arguments.size(); i++)
             {
                 node->arguments[i]->accept(*this);
-                
-                
-                if(node->arguments[i]->getType()!=type->arguments[i].second->type)
+                 
+                if(node->arguments[i]->getType()!=typeInst->arguments[i].second->type)
                 {
                     std::string msg="The type arguments does not match ";
                     errorHandler.reportError(node->typeName,msg);
                     return;
                 }
-
             }
 
         }    

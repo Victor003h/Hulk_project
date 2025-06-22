@@ -1,19 +1,16 @@
-type Engine {
-    power: Number = 150.0;
-    getPower() => self.power;
+type Animal(age: Number) {
+    age: Number = age;
+
+    
+    speak(): Number => self.age;
 };
 
-type Car {
-    engine: Engine = new Engine();
-  
-    enginePower() => self.engine.getPower();
+type Dog inherits Animal {
+    breed: Number = 1;  
+
+    speak1(): Number => self.speak() + self.breed;
 };
 
-type Driver {
-    car: Car = new Car();
 
-    maxSpeed() => self.car.enginePower();
-};
-
-let d: Driver = new Driver()
-    in d.maxSpeed();
+let dog:Dog = new Dog(8)
+    in dog.speak1();
