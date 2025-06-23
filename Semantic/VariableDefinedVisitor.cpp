@@ -23,13 +23,11 @@ class VariableDefindedVisitor:public Visitor
             }
         }
         
-        
         void visit(TypeNode* node)  override
         {
-        
             if(context->exist_Type(node->name.lexeme))
             {
-                std::string msg="The class"+ node->name.lexeme+" already exists";
+                std::string msg="The type "+ node->name.lexeme+" already exists.";
                 errorHandler.reportError(node->name,msg);
                 return;
             }
@@ -45,15 +43,15 @@ class VariableDefindedVisitor:public Visitor
                 {
                     if(tp==node->parentName.lexeme)
                     {
-                        std::string msg="Can't inherit" +node->name.lexeme + "from a basic type like "+tp;
+                        std::string msg="The type " + node->name.lexeme + " cannot inherit from inner type like "+tp+".";
                         errorHandler.reportError(node->parentName,msg);
                         return;
                     }
                 }
-
+    
                 if(!context->exist_Type(node->parentName.lexeme))
                 {
-                    std::string msg="The class "+ node->parentName.lexeme+"  is not defined";
+                    std::string msg="The type "+ node->parentName.lexeme+" is not defined.";
                     errorHandler.reportError(node->parentName,msg);
                     return;
                 }
@@ -63,20 +61,21 @@ class VariableDefindedVisitor:public Visitor
             }
           
             currentType=context->CreateType(node->name.lexeme);
+            node->type=currentType->name;
             currentType->parent=parent;
             bool hasArg=false;
             for(auto arg:node->args)
             {
                 hasArg=true;
                 auto id= static_cast<IdentifierNode*>(arg);
-                context->Define_local_Atribute(id->value.lexeme,id->getType());
                 if(currentType->exist_Argument(id->value.lexeme))
                 {
-                    std::string msg="The argument "+ node->parentName.lexeme+"  already exist";
+                    std::string msg="The argument "+ id->value.lexeme+" already exist";
                     errorHandler.reportError(id->value,msg);
                     return;
                 }
                 currentType->DefineArgument(id->value.lexeme,id->type);
+                context->Define_local_Attribute(id->value.lexeme,id->getType());
             }
 
             if(node->parentName.lexeme!="")
@@ -92,8 +91,8 @@ class VariableDefindedVisitor:public Visitor
                             if(currentp->parent->name=="Object")
                             {
                                 if(node->parent_args.size()==0) break;
-                                std::string msg="Parent receive invalid number of arguments";
-                                errorHandler.reportError(node->name,msg);
+                                std::string msg="The Parent type should receive "+std::to_string(currentp->arguments.size())+" arguments.";
+                                errorHandler.reportError(node->parentName,msg);
                                 return;
                             }
 
@@ -103,8 +102,8 @@ class VariableDefindedVisitor:public Visitor
 
                         if(node->parent_args.size()!=currentp->arguments.size())
                         {
-                            std::string msg="Parent receive invalid number of arguments";
-                            errorHandler.reportError(node->name,msg);
+                            std::string msg="The Parent type should receive "+std::to_string(currentp->arguments.size())+" arguments.";
+                            errorHandler.reportError(node->parentName,msg);
                             return;
                         }
 
@@ -113,8 +112,7 @@ class VariableDefindedVisitor:public Visitor
                         
                         break;
                     }
-                }
-              
+                }   
                 else
                 {
                     auto currentp=parent;
@@ -127,8 +125,6 @@ class VariableDefindedVisitor:public Visitor
             }
 
       
-            
-            
             for(auto atribute : node->atributes)
             {
                 atribute->accept(*this);
@@ -136,8 +132,8 @@ class VariableDefindedVisitor:public Visitor
 
             for(auto atribute : node->atributes)
             {
-                auto atr=static_cast<AtributeNode*>(atribute);
-                context->Define_local_Atribute(atr->id.lexeme,atr->getType());
+                auto atr=static_cast<AttributeNode*>(atribute);
+                context->Define_local_Attribute(atr->id.lexeme,atr->getType());
             };
 
 
@@ -155,87 +151,116 @@ class VariableDefindedVisitor:public Visitor
             temp->methods=currentType->methods;
             temp->parentInstantiation=currentType->parentInstantiation;
             currentType=lastType;
-
+    
         };
 
-        void visit(AtributeNode* node)
+        void visit(AttributeNode* node)
         {
-           
             if(  currentType!=nullptr &&!comingFromLet )
             {
-                if(currentType->exist_Atribute(node->id.lexeme))
+                if(currentType->exist_Attribute(node->id.lexeme))
                 {
-                    std::string msg="The atribute name "+ node->id.lexeme+" already exists in this type";
+                    std::string msg="The attribute "+ node->id.lexeme+" is already defined in this type";
                     errorHandler.reportError(node->id,msg);
                     return;
                 }
-
-                     
+                
 
                 node->expression->accept(*this);
+                if(node->type!="")
+                {
+                    if(!context->exist_Type(node->type))
+                    {
+                        std::string msg="The type "+ node->type+" is not defined.";
+                        errorHandler.reportError(node->id,msg);
+                        return;                        
+                    }
+                    if(node->type!=node->expression->type)
+                    {
+                        std::string msg="The attribute type '"+node->type+"' does not match the initialization type '"+node->expression->type +"'.";
+                        errorHandler.reportError(node->id,msg);
+                        return;
+                    }
+                }
+                else    node->type=node->expression->type;
              
-                currentType->DefineAtribute(node->id.lexeme,node->expression->getType());   
-                //  bool ok=context->Define_local_Atribute(node->id.lexeme,node->expression->getType());
-                // if(!ok)
-                // {
-                //     std::string msg="The type"+ node->expression->getType()+" does not already exists";
-                //     errorHandler.reportError(node->id,msg);
-                //     return;   
-                // }
-
-                 return;
+                currentType->DefineAttribute(node->id.lexeme,node->expression->getType()); 
+                return;
             }
 
-            if(context->exist_local_Atribute(node->id.lexeme))
+            if(context->exist_local_Attribute(node->id.lexeme))
             {
-                std::string msg="The name "+ node->id.lexeme+" already exists";
-                errorHandler.reportError(node->id,msg);
-                return;   
-
-            }
-              
-            node->expression->accept(*this);
-            bool ok=context->Define_local_Atribute(node->id.lexeme,node->getType());
-            if(!ok)
-            {
-                std::string msg="The type"+ node->expression->getType()+" does not already exists";
+                std::string msg="The attribute "+ node->id.lexeme+" is already defined in this context";
                 errorHandler.reportError(node->id,msg);
                 return;
             }
+              
+            node->expression->accept(*this);
+            if(node->type!="")
+            {
+                if(!context->exist_Type(node->type))
+                {
+                    std::string msg="The type "+ node->type+" is not defined.";
+                    errorHandler.reportError(node->id,msg);
+                    return;                        
+                }
+                if(node->type!=node->expression->type)
+                {
+                    std::string msg="The attribute type '"+node->type+"' does not match the initialization type '"+node->expression->type +"'.";
+                    errorHandler.reportError(node->id,msg);
+                    return;
+                }
+            }
+            else    node->type=node->expression->type;
             
+            bool ok=context->Define_local_Attribute(node->id.lexeme,node->type);    
         };
+ 
         
         void visit(MethodNode* node)         
-        {
-            
+        {   
             if(currentType!=nullptr )
             {
-                if(context->exist_Method(node->id.lexeme))
+                if(currentType->exist_Method(node->id.lexeme))
                 {
-                    std::string msg="The method method  "+ node->id.lexeme +" is already defined";
+                    std::string msg="The method "+ node->id.lexeme +" is already defined in this type";
                     errorHandler.reportError(node->id,msg);
                     return;
                 }
             }
             context= context->createChildContext();           
-            std::vector<Atribute> args;
+            std::vector<Attribute> args;
 
             for(auto param:node->params)
             {
                 if (IdentifierNode* p = dynamic_cast<IdentifierNode*>(param)) 
                 {
-                
-                    if(context->exist_local_Atribute(p->value.lexeme))
+                    if(context->exist_local_Attribute(p->value.lexeme))
                     {
-                        if(context->exist_Method(node->id.lexeme))
-                        {
-                            std::string msg="the param name"+ node->id.lexeme+ "already exits ";
-                            errorHandler.reportError(node->id,msg);
-                            return;
-                        }
+                        
+                        std::string msg="The Param name "+ node->id.lexeme+ "already exits.";
+                        errorHandler.reportError(node->id,msg);
+                        return;
+                        
                     }
-                    context->Define_local_Atribute(p->value.lexeme,p->getType());
-                    args.push_back(Atribute(p->value.lexeme,p->getType()));
+                    if(p->type=="")
+                    {
+                        std::string msg="Unknown type of Parameter "+p->value.lexeme;
+                        errorHandler.reportError(p->value,msg);
+                        return;
+                    }
+                    else
+                    {
+                        if(!context->exist_Type(p->type))
+                        {
+                            std::string msg="The type "+ p->type +" is not defined.";
+                            errorHandler.reportError(p->value,msg);
+                            return;                        
+                        }
+
+                    }
+                    context->Define_local_Attribute(p->value.lexeme,p->type); // todo: inferir tipo de los parametros
+                    args.push_back(Attribute(p->value.lexeme,p->type));
 
                 }
                 else
@@ -247,14 +272,31 @@ class VariableDefindedVisitor:public Visitor
             }
             
             node->body->accept(*this);
-          //  node->type=node->body->getType();
-          
-    
-            context= context->RemoveContext(); 
+            if(node->type!="")
+            {
+                if(!context->exist_Type(node->type))
+                {
+                    std::string msg="The type "+ node->type+" is not defined.";
+                    errorHandler.reportError(node->id,msg);
+                    return;                        
+                }
+                if(node->type!=node->body->type)
+                {
+                    std::string msg="The return type '"+node->type+"' does not match the body type '"+node->body->type +"'.";
+                    errorHandler.reportError(node->id,msg);
+                    return;
+                }
+            }
+            context= context->RemoveContext();
+            node->type=node->body->type;
+
 
             if(currentType!=nullptr)
                 currentType->DefineMethod(node->id.lexeme,node->type,args);
-               
+            else
+            {
+                context->methods[node->id.lexeme]->m_returnType=node->type;
+            }
         };
 
         void visit(LetExpression* node)
@@ -267,18 +309,21 @@ class VariableDefindedVisitor:public Visitor
             }
             node->body->accept(*this);
             comingFromLet=false;
-           // node->type=node->body->getType();
+            node->type=node->body->type;
 
             context=context->RemoveContext();
             
         };
 
-        void visit(BlockNode* node) 
+        void visit(BlockNode* node)  // el tipo sera el tipo de la ultima expresion
         {
+            std::string t="";
             for(auto exp :node->exprs)
             {
                 exp->accept(*this);
+                t=exp->type;
             }
+            node->type=t;
         };
        
         void visit(BinaryExpression* node)  
@@ -286,30 +331,37 @@ class VariableDefindedVisitor:public Visitor
             node->left->accept(*this);
             node->right->accept(*this);
             
-            //std::set<std::string> boolop={"<","<=",">",">=","==","!="};
-           // std::set<std::string> aritop={"+","-","/","*","^","%"};
+            std::set<std::string> boolop={"<","<=",">",">=","==","!="};
+            std::set<std::string> aritop={"+","-","/","*","^","%"};
 
-            //  if(boolop.find(node->op.lexeme)!=boolop.end())
-            //  {
-            //     if(node->left->getType()=="Object" &&node->right->getType()=="Number")
-            //         node->left->setType("Number");
-            //     else if (node->right->getType()=="Object" &&node->left->getType()=="Number")
-            //             node->left->setType("Number");
-                
-            //  }
+            if(node->left->type!=node->right->type || node->left->type!="Number" || node->left->type!="Boolean" )
+            {
+                std::string msg="Invalid operation between type "+node->left->type +" and type "+node->right->type ;
+                errorHandler.reportError(node->op,msg);
+                return;
+            }
+            if(node->left->type=="Number")
+            {
+                if(aritop.find(node->op.lexeme)==aritop.end())
+                {
+                    std::string msg="Invalid operation between type "+node->left->type +" and type "+node->right->type ;
+                    errorHandler.reportError(node->op,msg);
+                    return;
+                }
+                node->type="Number";
+            }
+            else if(node->left->type=="Boolean")
+            {
+                if(boolop.find(node->op.lexeme)==boolop.end())
+                {
+                    std::string msg="Invalid operation between type "+node->left->type +" and type "+node->right->type ;
+                    errorHandler.reportError(node->op,msg);
+                    return;
+                }
+                node->type="Boolean";
 
+            }
             
-            // if(node->left->getType()!=node->right->getType())
-            // {
-            //     std::string msg="los tipos no coinciden ";
-            //     errorHandler.reportError(node->op,msg);
-            //     return;
-            // }
-            // if(boolop.find(node->op.lexeme)!=boolop.end())
-            //     node->type="Boolean";
-            // else
-            //     node->type=node->left->getType();
-    
         };
         
         void visit(IdentifierNode* node)     
@@ -328,7 +380,7 @@ class VariableDefindedVisitor:public Visitor
 
             if(!context->exist_Atribute(node->value.lexeme))
             {
-                std::string msg="The name "+ node->value.lexeme+ " does not exists";
+                std::string msg="The name "+ node->value.lexeme+ " does not exist";
                 errorHandler.reportError(node->value,msg);
                 return;
             }
@@ -339,7 +391,7 @@ class VariableDefindedVisitor:public Visitor
         }; 
 
           
-        void visit(IfExpression* node)       
+        void visit(IfExpression* node)    //todo inferir el tipo    
         {
             std::vector<std::string> exp_types;
             for(auto [cond,exp] :node->exprs_cond)
@@ -347,8 +399,8 @@ class VariableDefindedVisitor:public Visitor
                 cond->accept(*this);
                 if(cond->getType()!="Boolean")
                 {
-                    std::string msg="the condition ,bust be bool  ";
-                    errorHandler.reportError(Token(),msg);
+                    std::string msg="The condition ,bust be bool.";
+                    errorHandler.reportError(node->id,msg);
                     return;
                 }
                 exp->accept(*this);
@@ -376,8 +428,7 @@ class VariableDefindedVisitor:public Visitor
         
        
         void visit(FunCallNode* node) 
-        {
-            
+        {    
             Method* meth=nullptr;
             if(currentType!=nullptr)
             {
@@ -405,7 +456,7 @@ class VariableDefindedVisitor:public Visitor
 
              if(meth->m_paramaters.size()!=node->arguments.size())
              {
-                std::string msg="The function "+ node->id.lexeme + " must receive  argm";
+                std::string msg="The function "+ node->id.lexeme + " must receive "+std::to_string(meth->m_paramaters.size())+ "args";
                 errorHandler.reportError(node->id,msg);
                 return;
 
@@ -415,12 +466,12 @@ class VariableDefindedVisitor:public Visitor
                 auto arg=node->arguments[i];
                 arg->accept(*this);
 
-                // if(arg->getType()!=meth->m_paramaters[i].type)
-                // {
-                //     std::string msg="invalid type  of argument in function "+ node->id.lexeme;
-                //     errorHandler.reportError(node->id,msg);
-                //     return;
-                // }
+                if(arg->type!=meth->m_paramaters[i].type)
+                {
+                    std::string msg="invalid type of argument in function "+ node->id.lexeme;
+                    errorHandler.reportError(node->id,msg);
+                    return;
+                }
             }
             node->type=meth->m_returnType;
 
@@ -451,7 +502,7 @@ class VariableDefindedVisitor:public Visitor
                     return;
                 }
 
-                if (!objType->exist_Atribute(id->value.lexeme)) {
+                if (!objType->exist_Attribute(id->value.lexeme)) {
                     std::string msg = "The name '" + id->value.lexeme + "' is not an attribute of type " + objType->name;
                     errorHandler.reportError(id->value, msg);
                     return;
@@ -500,8 +551,15 @@ class VariableDefindedVisitor:public Visitor
 
         void visit(DestructiveAssignNode* node) 
         {
+            
             node->lhs->accept(*this);
             node->rhs->accept(*this);
+
+            if(node->lhs->type!=node->rhs->type)
+            {
+                std::string msg="The right side mus be of type "+ node->lhs->type;
+                errorHandler.reportError(node->op_des,msg);
+            }
            
         }
        

@@ -92,7 +92,7 @@ public:
     {
         for (size_t i = 0; i < node->atributes.size(); i++)
         {
-            auto attr= static_cast<AtributeNode*>(node->atributes[i]);
+            auto attr= static_cast<AttributeNode*>(node->atributes[i]);
             if(attr->id.lexeme==member) return i;
         }
         
@@ -158,7 +158,7 @@ public:
     void visit(BinaryExpression* node)     ;
     void visit(LiteralNode* node)          ;
     void visit(IdentifierNode* node)    ;
-    void visit(AtributeNode* node)          ;
+    void visit(AttributeNode* node)          ;
     void visit(MethodNode* node)        ;
     void visit(IfExpression* node)          ;
     void visit(WhileExpression* node)       ;
@@ -208,21 +208,21 @@ void CodeGenerationContext::generateIR(AstNode* root)
     root->accept(visitor);
 
 
-        auto val=visitor.lastValue;
-        if(!val)    return;
-        if (val->getType()->isDoubleTy()) { // Number
-            llvm::Value* format = getFormatString();
-            irBuilder.CreateCall(llvmModule.getFunction("printf"), {format, val});
-        } else if (val->getType()->isIntegerTy(1)) { // Boolean
-            llvm::Value* str = irBuilder.CreateSelect(
-                val,
-                irBuilder.CreateGlobalStringPtr("true\n"),
-                irBuilder.CreateGlobalStringPtr("false\n")
-            );
-            irBuilder.CreateCall(llvmModule.getFunction("puts"), {str});
-        } else if (val->getType()->isPointerTy()) { // String
-            irBuilder.CreateCall(llvmModule.getFunction("puts"), {val});
-        }
+        // auto val=visitor.lastValue;
+        // if(!val)    return;
+        // if (val->getType()->isDoubleTy()) { // Number
+        //     llvm::Value* format = getFormatString();
+        //     irBuilder.CreateCall(llvmModule.getFunction("printf"), {format, val});
+        // } else if (val->getType()->isIntegerTy(1)) { // Boolean
+        //     llvm::Value* str = irBuilder.CreateSelect(
+        //         val,
+        //         irBuilder.CreateGlobalStringPtr("true\n"),
+        //         irBuilder.CreateGlobalStringPtr("false\n")
+        //     );
+        //     irBuilder.CreateCall(llvmModule.getFunction("puts"), {str});
+        // } else if (val->getType()->isPointerTy()) { // String
+        //     irBuilder.CreateCall(llvmModule.getFunction("puts"), {val});
+        // }
     
    
 
@@ -434,7 +434,7 @@ void LlvmVisitor::visit(TypeNode* node) {
     
     for (AstNode* attr : node->atributes) 
     {
-        auto atr=static_cast<AtributeNode*>(attr);
+        auto atr=static_cast<AttributeNode*>(attr);
         
         attr->accept(*this);  
         
@@ -832,13 +832,12 @@ void LlvmVisitor::visit(WhileExpression* node)
 };
 
 
-
 void LlvmVisitor::visit(LetExpression* node)      
 {
     cgContext.pushLocalScope();
     for(auto asg:node->assignments)
     {
-        auto atrib=dynamic_cast<AtributeNode*>(asg);
+        auto atrib=dynamic_cast<AttributeNode*>(asg);
 
         atrib->expression->accept(*this);
         llvm::Value* expValue=lastValue;
@@ -863,6 +862,42 @@ void LlvmVisitor::visit(LetExpression* node)
 void LlvmVisitor::visit(FunCallNode* node) {
     // Buscar la función por su nombre
     std::string methname=node->id.lexeme;
+    if(methname=="print")
+    {
+        node->arguments[0]->accept(*this);
+        auto val=lastValue;
+        llvm::Value* formatStr=nullptr;
+
+        auto printf=cgContext.llvmModule.getFunction("printf");
+
+
+        if (val->getType()->isPointerTy()) {
+
+        formatStr = cgContext.irBuilder.CreateGlobalStringPtr("%s\n");
+    } else if (val->getType()->isIntegerTy(1)) {
+
+        llvm::Value* trueStr = cgContext.irBuilder.CreateGlobalStringPtr("true");
+        llvm::Value* falseStr = cgContext.irBuilder.CreateGlobalStringPtr("false");
+        
+        val = cgContext.irBuilder.CreateSelect(val, trueStr, falseStr);
+        formatStr = cgContext.irBuilder.CreateGlobalStringPtr("%s\n");
+    } else if (val->getType()->isIntegerTy()) {
+
+        formatStr = cgContext.irBuilder.CreateGlobalStringPtr("%d\n");
+    } else if (val->getType()->isDoubleTy()) {
+
+        formatStr = cgContext.irBuilder.CreateGlobalStringPtr("%.6g\n");
+    } else {
+
+        formatStr = cgContext.irBuilder.CreateGlobalStringPtr("Unsupported type\n");
+    }
+
+
+    lastValue= cgContext.irBuilder.CreateCall(printf, {formatStr, val});
+    return;
+
+    }
+
     if(cgContext.currentType!="")
     {
         methname=methname+"_"+cgContext.currentType;
@@ -962,7 +997,7 @@ void LlvmVisitor::visit(MemberCall* node)
         llvm::Type* attrType = objStruct->getElementType(structIndex);
         
         auto temp=cgContext.namedTypeNode[objTypeStr]->atributes[index];
-        auto memberTypeStr=static_cast<AtributeNode*>(temp);
+        auto memberTypeStr=static_cast<AttributeNode*>(temp);
         if(cgContext.getInteralType(memberTypeStr->type)==nullptr)
         {
             auto ptr=llvm::PointerType::get(attrType,0);
@@ -1048,20 +1083,16 @@ void LlvmVisitor::visit(LiteralNode* node)
         double numVal = std::stod(node->value.lexeme);
         lastValue = llvm::ConstantFP::get(cgContext.llvmContext, llvm::APFloat(numVal));
 
-      
-        return;
     }
     else if(node->type=="String")
     {
-        
+        lastValue=cgContext.irBuilder.CreateGlobalString(node->value.lexeme);
     }
     else if(node->type=="Boolean")
     {
         bool b= node->value.lexeme=="true";
         lastValue=llvm::ConstantInt::get(llvm::Type::getInt1Ty(cgContext.llvmContext),b);
-        return;
     }
-
 
 }
 
@@ -1145,7 +1176,7 @@ void LlvmVisitor::visit(DestructiveAssignNode* node)
     
 }
 
-void LlvmVisitor::visit(AtributeNode* node) {
+void LlvmVisitor::visit(AttributeNode* node) {
     if (node->expression) {
         node->expression->accept(*this);  // Esto debería dejar el resultado en `lastValue`
     } else {

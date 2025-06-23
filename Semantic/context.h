@@ -7,12 +7,12 @@
 
 
 
-struct Atribute
+struct Attribute
 {
     std::string name;
     std::string type;
 
-    Atribute(std::string name,std::string type)
+    Attribute(std::string name,std::string type)
     :name(name),type(type){}
 
 };
@@ -20,10 +20,10 @@ struct Atribute
 struct Method
 {
     std::string m_name;
-    std::vector<Atribute> m_paramaters;
+    std::vector<Attribute> m_paramaters;
     std::string m_returnType;
 
-    Method(std::string name,std::vector<Atribute> paramaters,std::string returnedtype)
+    Method(std::string name,std::vector<Attribute> paramaters,std::string returnedtype)
     {
         this->m_name=name;
         this->m_paramaters=paramaters;
@@ -36,8 +36,8 @@ struct Method
 struct Type
 {
     std::string name;
-    std::map<std::string,Atribute*> atributes;
-    std::vector<std::pair<std::string,Atribute*>>arguments;
+    std::map<std::string,Attribute*> atributes;
+    std::vector<std::pair<std::string,Attribute*>>arguments;
     std::map<std::string,Method*> methods;
     Type* parent=nullptr;
     std::string parentInstantiation;
@@ -48,18 +48,18 @@ struct Type
     Type(){}
 
 
-    void DefineAtribute(std::string name,std::string type)
+    void DefineAttribute(std::string name,std::string type)
     {
-        atributes.emplace(name, new Atribute(name,type));
+        atributes.emplace(name, new Attribute(name,type));
     }
 
     void DefineArgument(std::string name,std::string type)
     {
-        arguments.push_back({name, new Atribute(name,type)});
+        arguments.push_back({name, new Attribute(name,type)});
     }
 
 
-    bool exist_Atribute(std::string name)
+    bool exist_Attribute(std::string name)
     {
         return atributes.find(name)!=atributes.end();
     }
@@ -84,7 +84,7 @@ struct Type
     }
 
     
-    void DefineMethod(std::string name,std::string type,std::vector<Atribute> paramaters)
+    void DefineMethod(std::string name,std::string type,std::vector<Attribute> paramaters)
     {
         
         methods.emplace(name,new Method(name,paramaters,type));
@@ -192,14 +192,14 @@ class Context
             return parent->exist_Atribute(name);
         }
 
-        bool exist_local_Atribute(std::string name) 
+        bool exist_local_Attribute(std::string name) 
         {
             return atributes.find(name)!=atributes.end();
         
         }
 
 
-        bool Define_local_Atribute(std::string name,std::string typeName)  ////// 
+        bool Define_local_Attribute(std::string name,std::string typeName)  ////// 
         {
             if(!exist_Type(typeName)) return false;/////// inneceisario?
             Type* type =GetType(typeName);
@@ -225,7 +225,7 @@ class Context
         }
         
 
-        bool DefineMethod(std::string name,std::string type,std::vector<Atribute> paramaters)
+        bool DefineMethod(std::string name,std::string type,std::vector<Attribute> paramaters)
         {
             if(methods.find(name)!=methods.end()) return false;
 
@@ -253,7 +253,7 @@ class Context
                 t->parent=object;
             }
 
-            DefineMethod("print","Object",{Atribute("value","Object")});
+            DefineMethod("print","Object",{Attribute("value","Object")});
 
         }
 

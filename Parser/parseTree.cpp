@@ -100,7 +100,7 @@ class AstBuilderVisitor: public ParseTreeVisitor
                 std::vector<std::pair<AstNode*,AstNode*>> exprs_cond=ElifList(node->m_children[2]);
                 exprs_cond.insert(exprs_cond.begin(),{node->m_children[5]->accept(*this),node->m_children[3]->accept(*this)});
                 
-                return new IfExpression(defaultExp,exprs_cond);
+                return new IfExpression(node->m_children[7]->m_token,defaultExp,exprs_cond);
             }
 
             if(node->m_value->value=="While_loop")
@@ -142,7 +142,7 @@ class AstBuilderVisitor: public ParseTreeVisitor
             if(node->m_value->value=="AssignmentDecl")
             {
                 auto body=node->m_children[0]->accept(*this);
-                auto atrib=new AtributeNode(node->m_children[3]->m_token,body);
+                auto atrib=new AttributeNode(node->m_children[3]->m_token,body);
                 if(!(node->m_children[2]->m_children.empty()))
                 {
                     atrib->setType(node->m_children[2]->m_children[0]->m_token.lexeme);
@@ -302,6 +302,12 @@ class AstBuilderVisitor: public ParseTreeVisitor
                    l->type="Number";
                     return l;
                 }
+                if(node->m_children[0]->m_value->value=="String")
+                {
+                   auto l= new LiteralNode(node->m_children[0]->m_token);
+                   l->type="String";
+                    return l;
+                }
                 if(node->m_children[0]->m_value->value=="kw_false_" ||node->m_children[0]->m_value->value=="kw_true_")
                 {
                    auto l= new LiteralNode(node->m_children[0]->m_token);
@@ -343,7 +349,7 @@ class AstBuilderVisitor: public ParseTreeVisitor
             if(node->m_children[1]->m_children.size()==2)
             {
                 AstNode* exp=node->m_children[1]->m_children[0]->accept(*this);
-                auto atr=new AtributeNode(id,exp);
+                auto atr=new AttributeNode(id,exp);
                 if(!(node->m_children[2]->m_children.empty()))
                 {
                     atr->setType(node->m_children[2]->m_children[0]->m_token.lexeme);

@@ -4,8 +4,7 @@
 
 using REPtr = std::shared_ptr<RE>;
 
-class RegexParser 
-{
+class RegexParser {
     const std::string input;
     size_t pos = 0;
 
@@ -71,7 +70,7 @@ REPtr RegexParser::parse_closure() {
     return atom;
 }
 
-REPtr RegexParser::parse_atom() {
+REPtr RegexParser::parse_atom(){
     if (eat('(')) {
         auto r = parse_union();
         if (!eat(')')) return nullptr;// throw std::runtime_error("Unclosed paren");

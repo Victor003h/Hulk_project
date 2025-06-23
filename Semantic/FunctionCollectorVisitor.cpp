@@ -31,11 +31,11 @@ class FunctionCollectorVisitor: public Visitor
             return;
         }
 
-        std::vector<Atribute> args;
+        std::vector<Attribute> args;
         for(auto param:node->params)
         {
             if (IdentifierNode* p = dynamic_cast<IdentifierNode*>(param)) {
-            args.push_back(Atribute(p->value.lexeme,p->type));
+            args.push_back(Attribute(p->value.lexeme,p->type));
             }
             else
             {
@@ -47,7 +47,7 @@ class FunctionCollectorVisitor: public Visitor
         context->DefineMethod(node->id.lexeme,node->type,args);
          
     };
-    void visit(AtributeNode* node)       
+    void visit(AttributeNode* node)       
     {
         
     };

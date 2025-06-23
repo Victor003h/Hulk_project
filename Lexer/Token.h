@@ -16,14 +16,14 @@ enum TokenType {
     op_Divide,         // /
     op_Modulo,         // %
     op_Equal,          // ==
-    op_NotEqual, 
+    op_NotEqual,       // !=
     op_Less,           // <
     op_LessEqual,      // <=
     op_Greater,        // >
     op_GreaterEqual,   // >=
-    op_LogicalAnd,
-    op_LogicalOr,
-    op_LogicalNot,
+    op_LogicalAnd,     // &&
+    op_LogicalOr,       // ||
+    op_LogicalNot,    
     op_And,            // &
     op_Or,             // |
     op_Not,            // !
@@ -39,19 +39,18 @@ enum TokenType {
     punc_Semicolon,      // ;
     punc_Comma,          // ,
     punc_Dot,            // .
-    punc_Colon,
-    punc_at,
-    punc_doubleAt,
+    punc_Colon,         // :
+    punc_at,           //@
+    punc_doubleAt,     //@@
 
     // Asignación 
     Assignment,     // =
 
-
     // Keywords
-    kw_if,             // "if"
-    kw_else,           // "else"
-    kw_for,            // "for"
-    kw_while,          // "while"
+    kw_if,            
+    kw_else,           
+    kw_for,            
+    kw_while,          
     kw_break,
     kw_Switch,
     kw_Case,
@@ -74,9 +73,7 @@ enum TokenType {
     kw_as,
     
 
-    
-    //
-    arrow,
+    arrow, // =>
 
     //Internal
     Keyword,
@@ -91,6 +88,7 @@ std::string getStringOfToken(TokenType type) {
     switch (type) {
         // Literales e identificadores
         case TokenType::Number:         return "Number";
+        case TokenType::String:         return "String";
         case TokenType::Identifier:     return "Identifier";
 
         // Operadores aritméticos
@@ -111,6 +109,9 @@ std::string getStringOfToken(TokenType type) {
         case TokenType::punc_Semicolon:   return "punc_Semicolon";
         case TokenType::punc_Comma:       return "punc_Comma";
         case TokenType::punc_Dot:         return "punc_Dot";
+        case TokenType::punc_at:         return "punc_at";
+        case TokenType::punc_doubleAt:   return "punc_doubleAt";
+        case TokenType::punc_Colon:      return "punc_Colon";
 
         // Asignación y comparación
         case TokenType::Assignment:   return "Assignment";
@@ -123,12 +124,12 @@ std::string getStringOfToken(TokenType type) {
         case TokenType::op_Greater:       return "op_Greater";
         case TokenType::op_GreaterEqual:  return "op_GreaterEqual";
 
-        // Operadores lógicos / bit a bit
+        // Operadores lógicos / 
         case TokenType::op_And:       return "op_And";
         case TokenType::op_Or:        return "op_Or";
         case TokenType::op_Not:       return "op_Not";
 
-        // Palabras clave de la nueva lista
+        // Palabras claves
         case TokenType::kw_if:        return "kw_if";
         case TokenType::kw_else:      return "kw_else";
         case TokenType::kw_for:       return "kw_for";
@@ -142,19 +143,6 @@ std::string getStringOfToken(TokenType type) {
         case TokenType::op_LogicalNot:return "op_LogicalNot";
         case TokenType::kw_Continue:  return "kw_Continue";
         case TokenType::kw_Return:    return "kw_Return";
-
-        // Tokens sin sustitución (se mantienen igual)
-        case TokenType::punc_at:         return "punc_at";
-        case TokenType::punc_doubleAt:   return "punc_doubleAt";
-        case TokenType::kw_extends:      return "kw_extends";
-        case TokenType::punc_Colon:      return "punc_Colon";
-        case TokenType::kw_type:         return "kw_type";
-        case TokenType::arrow:           return "arrow";
-        case TokenType::kw_is:           return "kw_is";
-        case TokenType::kw_as:           return "kw_as";
-        case TokenType::op_destruc:      return "op_destruc";
-
-        // Palabras clave adicionales
         case TokenType::kw_elif:         return "kw_elif";
         case TokenType::kw_protocol:     return "kw_protocol";
         case TokenType::kw_in:           return "kw_in";
@@ -165,8 +153,14 @@ std::string getStringOfToken(TokenType type) {
         case TokenType::kw_false_:       return "kw_false_";
         case TokenType::kw_new_:         return "kw_new_";
         case TokenType::kw_null_:        return "kw_null_";
+        case TokenType::kw_extends:      return "kw_extends";
+        case TokenType::kw_is:           return "kw_is";
+        case TokenType::kw_as:           return "kw_as";
+        case TokenType::kw_type:         return "kw_type";
 
 
+        case TokenType::arrow:           return "arrow";
+        case TokenType::op_destruc:      return "op_destruc";
         case TokenType::EOFs:        return "EOFs";
         default:                       return "Unknown";
     }
@@ -178,7 +172,11 @@ TokenType GetType(TokenType token)
     std::string st=getStringOfToken(token).substr(0,3);
     if(st=="kw_")   return Keyword;
     if(st=="op_")   return Operator;
-    if(st=="punc")   return Punctuator;
+    if(st=="punc")
+    {
+        if(token==TokenType::punc_Dot)  return punc_Dot;
+        return Punctuator;
+    }
 
     return token;
 
@@ -186,10 +184,11 @@ TokenType GetType(TokenType token)
 
 int tokenPrecedence(TokenType token) {
     switch(token) {
-        case TokenType::Keyword:    return 3; 
-        case TokenType::Identifier: return 2; 
-        case TokenType::Number:     return 1;
-        case TokenType::Operator:   return 0;
+        case TokenType::Keyword:    return 20; 
+        case TokenType::Identifier: return 15; 
+        case TokenType::punc_Dot:   return 10; 
+        case TokenType::Number:     return 7;
+        case TokenType::Operator:   return 6;
         case TokenType::UNKNOWN:    return -2;
         default:                    return -1; 
     }
@@ -198,8 +197,6 @@ int tokenPrecedence(TokenType token) {
 bool morePriority(TokenType token1, TokenType token2) {
     return tokenPrecedence(GetType(token1)) > tokenPrecedence(GetType(token2));
 }
-
-
 
 
 struct Token{

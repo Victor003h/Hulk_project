@@ -22,7 +22,7 @@ public:
     void visit(BinaryExpression* node)     ;
     void visit(LiteralNode* node)          ;
     void visit(IdentifierNode* node)    ;
-    void visit(AtributeNode* node)          ;
+    void visit(AttributeNode* node)          ;
     void visit(MethodNode* node)        ;
     void visit(IfExpression* node)          ;
     void visit(WhileExpression* node)       ;

@@ -12,7 +12,7 @@ class BlockNode;
 class BinaryExpression;
 class LiteralNode;
 class IdentifierNode;
-class AtributeNode;
+class AttributeNode;
 class MethodNode;
 class IfExpression;
 class WhileExpression;
@@ -34,7 +34,7 @@ public:
     virtual void visit(BinaryExpression* node)  = 0;
     virtual void visit(LiteralNode* node)         = 0;
     virtual void visit(IdentifierNode* node)      = 0;
-    virtual void visit(AtributeNode* node)        = 0;
+    virtual void visit(AttributeNode* node)        = 0;
     virtual void visit(MethodNode* node)          = 0;
     virtual void visit(IfExpression* node)        = 0;
     virtual void visit(WhileExpression* node)     = 0;
@@ -51,17 +51,15 @@ class AstNode {
 public:
     virtual ~AstNode() {}
     virtual void print(int indent = 0) const = 0;
-    std::string type="Object";
+    std::string type="";
     virtual std::string getType()=0;
     virtual void setType(std::string type)=0;
-    virtual void accept(Visitor &visitor)=0; // Método virtual puro para el Visitor
+    virtual void accept(Visitor &visitor)=0;
 };
 
 class Expression : public AstNode {
 public:
     virtual ~Expression() {}
-    // Si Expression no se instancia directamente, puede dejarse sin implementación de accept,
-    // para que las clases concretas (BinaryExpression, LiteralNode, etc.) lo definan.
     virtual void accept(Visitor &visitor) = 0;
     virtual std::string getType()=0;
     virtual void setType(std::string type)=0;
@@ -111,12 +109,12 @@ public:
 
 };
 
-class AtributeNode : public AstNode {
+class AttributeNode : public AstNode {
 public:
     Token id;
     AstNode* expression;
 
-    AtributeNode(Token id, AstNode* expression)
+    AttributeNode(Token id, AstNode* expression)
         : id(id), expression(expression) {}
 
     void print(int indent = 0) const override {
@@ -276,10 +274,11 @@ class IfExpression : public AstNode {
 public:
     AstNode* defaultExp;
     std::vector<std::pair<AstNode*, AstNode*>> exprs_cond;
+    Token id;
  
 
-    IfExpression(AstNode* defaultExp, std::vector<std::pair<AstNode*, AstNode*>> exprs_cond)
-        : defaultExp(defaultExp), exprs_cond(exprs_cond) {}
+    IfExpression(Token id,AstNode* defaultExp, std::vector<std::pair<AstNode*, AstNode*>> exprs_cond)
+        :id(id) ,defaultExp(defaultExp), exprs_cond(exprs_cond) {}
 
     void print(int indent = 0) const override {
         std::string spacing(indent, ' ');
@@ -380,8 +379,6 @@ public:
     void setType(std::string t){type=t;}
 };
 
-
-
 class UnaryExpression :public Expression
 {
     public:
@@ -408,7 +405,6 @@ class UnaryExpression :public Expression
         }
         void setType(std::string t){type=t;}
 };
-
 
 class FunCallNode : public Expression {
 public:
@@ -470,7 +466,6 @@ class MemberCall:public AstNode
         void setType(std::string t){type=t;}
 };
 
-
 class DestructiveAssignNode : public AstNode {
 public:
     AstNode* lhs;  // Lo que está a la izquierda de :=
@@ -499,7 +494,6 @@ public:
         visitor.visit(this);
     }
 };
-
 
 class TypeInstantiation:public AstNode
 {

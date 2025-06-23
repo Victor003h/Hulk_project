@@ -27,13 +27,13 @@ int main() {
     auto tokens=lexer.scanTokens(input);
     if(lexer.errorHandler.hasErrors())
     {
+        lexer.errorHandler.printErrors();
         return 0;
     }
 
 
      Parser parser(error);
      auto cst= parser.parse(tokens);
-     
     if(cst==nullptr || parser.errorHandler.hasErrors())
     {
         parser.errorHandler.printErrors();

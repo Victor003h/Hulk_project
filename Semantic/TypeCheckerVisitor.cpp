@@ -41,7 +41,7 @@ class TypeCheckerVisitor:Visitor
             for(auto arg:node->args)
             {
                 auto id= static_cast<IdentifierNode*>(arg);
-                context->Define_local_Atribute(id->value.lexeme,id->getType());
+                context->Define_local_Attribute(id->value.lexeme,id->getType());
                 if(currentType->exist_Argument(id->value.lexeme))
                 {
                     std::string msg="The argument"+ node->parentName.lexeme+"  already exist";
@@ -59,8 +59,8 @@ class TypeCheckerVisitor:Visitor
 
             for(auto atribute : node->atributes)
             {
-                auto atr=static_cast<AtributeNode*>(atribute);
-                context->Define_local_Atribute(atr->id.lexeme,node->name.lexeme);
+                auto atr=static_cast<AttributeNode*>(atribute);
+                context->Define_local_Attribute(atr->id.lexeme,node->name.lexeme);
             };
 
 
@@ -74,12 +74,12 @@ class TypeCheckerVisitor:Visitor
 
         };
 
-        void visit(AtributeNode* node)
+        void visit(AttributeNode* node)
         {
            
             if(  currentType!=nullptr )
             {
-                if(currentType->exist_Atribute(node->id.lexeme))
+                if(currentType->exist_Attribute(node->id.lexeme))
                 {
                     std::string msg="The name "+ node->id.lexeme+" already exists in this type";
                     errorHandler.reportError(node->id,msg);
@@ -88,7 +88,7 @@ class TypeCheckerVisitor:Visitor
 
                 
                 node->expression->accept(*this);
-                currentType->DefineAtribute(node->id.lexeme,node->expression->getType());   
+                currentType->DefineAttribute(node->id.lexeme,node->expression->getType());   
                 // bool ok=context->Define_local_Atribute(node->id.lexeme,node->expression->getType());
                 // if(!ok)
                 // {
@@ -100,7 +100,7 @@ class TypeCheckerVisitor:Visitor
                  return;
             }
 
-            if(context->exist_local_Atribute(node->id.lexeme))
+            if(context->exist_local_Attribute(node->id.lexeme))
             {
                 std::string msg="The name "+ node->id.lexeme+" already exists";
                 errorHandler.reportError(node->id,msg);
@@ -109,7 +109,7 @@ class TypeCheckerVisitor:Visitor
             }
               
             node->expression->accept(*this);
-            bool ok=context->Define_local_Atribute(node->id.lexeme,node->expression->getType());
+            bool ok=context->Define_local_Attribute(node->id.lexeme,node->expression->getType());
             if(!ok)
             {
                 std::string msg="The type "+ node->expression->getType()+" does not already exists";
@@ -133,14 +133,14 @@ class TypeCheckerVisitor:Visitor
                 }
             }
             context= context->createChildContext();           
-            std::vector<Atribute> args;
+            std::vector<Attribute> args;
 
             for(auto param:node->params)
             {
                 if (IdentifierNode* p = dynamic_cast<IdentifierNode*>(param)) 
                 {
                 
-                    if(context->exist_local_Atribute(p->value.lexeme))
+                    if(context->exist_local_Attribute(p->value.lexeme))
                     {
                         if(context->exist_Method(node->id.lexeme))
                         {
@@ -149,8 +149,8 @@ class TypeCheckerVisitor:Visitor
                             return;
                         }
                     }
-                    context->Define_local_Atribute(p->value.lexeme,p->getType());
-                    args.push_back(Atribute(p->value.lexeme,p->getType()));
+                    context->Define_local_Attribute(p->value.lexeme,p->getType());
+                    args.push_back(Attribute(p->value.lexeme,p->getType()));
 
                 }
                 else

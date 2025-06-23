@@ -1,16 +1,1 @@
-type Animal(age: Number) {
-    age: Number = age;
-
-    
-    speak(): Number => self.age;
-};
-
-type Dog inherits Animal {
-    breed: Number = 1;  
-
-    speak1(): Number => self.speak() + self.breed;
-};
-
-
-let dog:Dog = new Dog(8)
-    in dog.speak1();
+ 234.432.43

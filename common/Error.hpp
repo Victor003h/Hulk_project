@@ -22,7 +22,6 @@ private:
 public:
     void reportError(int line, int column, const std::string &msg) {
         errors.push_back(CompilerError(line, column, msg));
-        std::cerr << "Error [line " << line << ", col " << column << "]: " << msg << std::endl;
     }
     
     void reportError(const Token &token, const std::string &msg) {

@@ -27,7 +27,7 @@ class TypeBuilderVisitor :public Visitor
             
             for(auto atribute : node->atributes)
             {
-                if (AtributeNode* type = dynamic_cast<AtributeNode*>(atribute)) {
+                if (AttributeNode* type = dynamic_cast<AttributeNode*>(atribute)) {
                 visit(type);
                 }
             };
@@ -42,25 +42,25 @@ class TypeBuilderVisitor :public Visitor
 
         }
 
-        void visit(AtributeNode* node) override
+        void visit(AttributeNode* node) override
         {
 
             //Type atrType=context.GetType(node->type);
 
-            currentType->DefineAtribute(node->id.lexeme,node->type);
+            currentType->DefineAttribute(node->id.lexeme,node->type);
 
         }
 
         void visit(MethodNode* node) override
         {  
 
-            std::vector<Atribute> args;
+            std::vector<Attribute> args;
             
-            std::vector<Atribute> arg;
+            std::vector<Attribute> arg;
             for(auto param:node->params)
             {
                 if (IdentifierNode* p = dynamic_cast<IdentifierNode*>(param)) {
-                args.push_back(Atribute(p->value.lexeme,p->type));
+                args.push_back(Attribute(p->value.lexeme,p->type));
                 }
                 else
                 {

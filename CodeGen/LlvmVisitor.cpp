@@ -26,14 +26,14 @@ void LlvmVisitor::visit(TypeNode* node) {
         if ( cgContext.getInteralType(attrTypeName)) {
             llvm::Type* type = cgContext.getInteralType(attrTypeName);
             attrTypes.push_back(type);
-            attrNames.push_back(static_cast<AtributeNode*>(attr)->id.lexeme);
+            attrNames.push_back(static_cast<AttributeNode*>(attr)->id.lexeme);
            
         }
         else
         {
             llvm::Type* type = cgContext.namedStruct[attrTypeName];
             attrTypes.push_back(type);
-            attrNames.push_back(static_cast<AtributeNode*>(attr)->id.lexeme);
+            attrNames.push_back(static_cast<AttributeNode*>(attr)->id.lexeme);
         
         }
     
@@ -112,7 +112,7 @@ void LlvmVisitor::visit(TypeNode* node) {
 
     for (AstNode* attr : node->atributes) 
     {
-        auto atr=static_cast<AtributeNode*>(attr);
+        auto atr=static_cast<AttributeNode*>(attr);
         llvm::Value* memberPtr = constructorBuilder.CreateStructGEP(structType, typedPtr, memberIndex);
         attr->accept(*this);  
         
@@ -568,7 +568,7 @@ void LlvmVisitor::visit(LetExpression* node)
     cgContext.pushLocalScope();
     for(auto asg:node->assignments)
     {
-        auto atrib=dynamic_cast<AtributeNode*>(asg);
+        auto atrib=dynamic_cast<AttributeNode*>(asg);
 
         atrib->expression->accept(*this);
         llvm::Value* expValue=lastValue;
@@ -793,7 +793,7 @@ void LlvmVisitor::visit(DestructiveAssignNode* node)
     
 }
 
-void LlvmVisitor::visit(AtributeNode* node) {
+void LlvmVisitor::visit(AttributeNode* node) {
     if (node->expression) {
         node->expression->accept(*this);  // Esto debería dejar el resultado en `lastValue`
     } else {
