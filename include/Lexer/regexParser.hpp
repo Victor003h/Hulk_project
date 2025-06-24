@@ -1,11 +1,9 @@
+#pragma once
 #include <memory>
-#include<string>
-#include "regular_expressions.cpp"
-
+#include "regular_expressions.hpp"
 using REPtr = std::shared_ptr<RE>;
 
-class RegexParser 
-{
+class RegexParser {
     const std::string input;
     size_t pos = 0;
 
@@ -14,7 +12,7 @@ public:
 
     REPtr parse() {
         auto r = parse_union();
-        if (pos != input.size()) throw std::runtime_error("Unexpected char at end");
+        if (pos != input.size())  return nullptr;//throw std::runtime_error("Unexpected char at end");
         return r;
     }
 

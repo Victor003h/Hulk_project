@@ -1,96 +1,53 @@
-#include<vector>
-#include<set>
-#include<map>
-#include<queue>
-#include <iostream>
-#include <fstream>
-#include <filesystem>
-#include "Token.h"
+#include "../include/Lexer/NFA.hpp"
 
-using namespace std;
-
-struct Transition
+   
+int DFA::nextState(char c, int state)
+   
 {
-    char character;
-    std::vector<int> to;
-
-    std::string type;
-
-    Transition(char c,std::vector<int> to,std::string t)
-    :character(c),to(to),type(t){}
-
-};
-
-
-
-class DFA{
-public:
-    int m_start_state;
-    int m_total_states;
-    std::vector<int> m_final_states;
-    std::set<char> m_alphabet;
-    std::map<int, std::vector<Transition>> m_transitions;
-    std::map<int, TokenType> m_final_token_types;
-
-  
-public: DFA(int start_state,int total_states,std::vector<int> final_states,
-        std::set<char>alphabet,std::map<int, std::vector<Transition>> transitions)
-    {
-        this->m_total_states=total_states;
-        this->m_start_state=start_state;
-        this->m_final_states=final_states;
-        this->m_alphabet=alphabet;
-        this->m_transitions=transitions;
-    }
-    DFA(){};
-
+    if(!is_valid(c))  return -2;   // wrong character
     
-    int nextState(char c, int state) 
+    auto tr=m_transitions.at(state);
+    std::vector<int> states={};
+    for (auto t:tr)
     {
-        if(!is_valid(c))  return -2;   // wrong character
+        if(t.character==c || t.type=="any") 
+            return t.to[0];
         
-        auto tr=m_transitions.at(state);
-        std::vector<int> states={};
-        for (auto t:tr)
-        {
-            if(t.character==c || t.type=="any") 
-                return t.to[0];
-            
-        }
-        return -1;
     }
+    return -1;
+}
     
-    bool is_valid(const char symbol)
+bool DFA::is_valid(const char symbol)
+{
+    if (m_alphabet.find(symbol)==m_alphabet.end())
     {
-        if (m_alphabet.find(symbol)==m_alphabet.end())
-        {
-            
-            return false;
-        }
-        return true;
-    }
-
-    bool is_final_state(int current_state)
-    {
-        for(int f_s :m_final_states){
-            if(current_state==f_s)  return true;
-        }
+        
         return false;
     }
+    return true;
+}
 
-    bool evualuate(std::string input)
-    {
-            
-        int current_state=m_start_state;
-        for(char symbol :input)
-        {
-            current_state=nextState(symbol,current_state);
-        }
-
-        return is_final_state(current_state);
+bool DFA::is_final_state(int current_state)
+{
+    for(int f_s :m_final_states){
+        if(current_state==f_s)  return true;
     }
+    return false;
+}
+
+bool DFA::evualuate(std::string input)
+{
+        
+    int current_state=m_start_state;
+    for(char symbol :input)
+    {
+        current_state=nextState(symbol,current_state);
+    }
+
+    return is_final_state(current_state);
+}
     
-    static bool existsDfa()
+ bool DFA::existsDfa()
     {
         return std::filesystem::exists("dfa.bin");
     }
@@ -169,402 +126,376 @@ public: DFA(int start_state,int total_states,std::vector<int> final_states,
 //         return dfa;
 // }
 
-};
+
  
 
 
-class NFA{
-public:
-
-    int m_start_state;
-    int m_total_states;
-    std::set<char> m_alphabet;
-    std::map<int, std::vector<Transition>> m_transitions;       
-    std::vector<int> m_final_states;
-    std::map<int, TokenType> m_final_token_types;
-    
-public:
-    NFA(int start_state,int total_states,std::vector<int> final_states,
-        std::set<char>alphabet,std::map<int, std::vector<Transition>> transitions)
-    {
-        this->m_total_states=total_states;
-        this->m_start_state=start_state;
-        this->m_final_states=final_states;
-        this->m_alphabet=alphabet;
-        this->m_transitions=transitions;         
+bool NFA::is_final_state(int current_state)
+{
+    for(int f_s :m_final_states){
+        if(current_state==f_s)  return true;
     }
+    return false;
+}
     
-    bool is_final_state(int current_state)
+std::pair<std::vector<int>,bool> NFA::nextStates(char c, int state,bool useAny) const 
+{
+    if(m_transitions.find(state)==m_transitions.end())  return{{},false};
+    auto tr=m_transitions.at(state);
+    std::vector<int> states={};
+    bool any=false;
+    for (auto t:tr)
     {
-        for(int f_s :m_final_states){
-            if(current_state==f_s)  return true;
+        if(t.character==c || (useAny &&  t.type=="any")) 
+        {
+            if(t.type=="any")   any=true;
+                states.insert(states.end(), t.to.begin(), t.to.end());
         }
+                        
+    }
+    return {states,any};
+}
+    
+bool NFA::is_valid(const char symbol)
+{
+    if (m_alphabet.find(symbol)==m_alphabet.end())
+    {
+        std::cout<<"el caracter" <<symbol<< " no pertenece a el alfabeto"<<std::endl ;
         return false;
     }
-    
-    std::pair<std::vector<int>,bool> nextStates(char c, int state,bool useAny) const 
-    {
-        if(m_transitions.find(state)==m_transitions.end())  return{{},false};
-        auto tr=m_transitions.at(state);
-        std::vector<int> states={};
-        bool any=false;
-        for (auto t:tr)
-        {
-            if(t.character==c || (useAny &&  t.type=="any")) 
-            {
-                if(t.type=="any")   any=true;
-                    states.insert(states.end(), t.to.begin(), t.to.end());
-            }
-                            
-        }
-        return {states,any};
-    }
-    
-    bool is_valid(const char symbol)
-    {
-        if (m_alphabet.find(symbol)==m_alphabet.end())
-        {
-            std::cout<<"el caracter" <<symbol<< " no pertenece a el alfabeto"<<std::endl ;
-            return false;
-        }
-        return true;
-    }
+    return true;
+}
 
-    bool evualuate(std::string input)
+bool NFA::evaluate(std::string input)
+{
+    std::vector<int> cs={m_start_state};
+    for(char symbol :input)
     {
-        std::vector<int> cs={m_start_state};
-        for(char symbol :input)
-        {
-            std::vector<int> aux={};
-
-            for (size_t i=0;i<cs.size();i++)
-            {
-                auto [eps,_]=eClousure(cs[i],false);
-                for(int i:eps) cs.push_back(i);
-
-                auto s=nextStates(symbol,cs[i],true);
-                for(int i:s.first) aux.push_back(i); 
-            }
-            cs=aux;
-        }
+        std::vector<int> aux={};
 
         for (size_t i=0;i<cs.size();i++)
         {
             auto [eps,_]=eClousure(cs[i],false);
             for(int i:eps) cs.push_back(i);
 
-            if(is_final_state(cs[i]))    return true;
+            auto s=nextStates(symbol,cs[i],true);
+            for(int i:s.first) aux.push_back(i); 
         }
-        return false;
-        }
-    
-    DFA convertToDFA()
+        cs=aux;
+    }
+
+    for (size_t i=0;i<cs.size();i++)
     {
-        std::map<std::set<int>,int> dfn_states={};
-        std::queue<std::set<int>> queue={};
-        std::map<int, std::vector<Transition>> trs={};
-        int cr=0;
-        auto [start,a]=eClousure_set({m_start_state});
-        queue.push(start);
-        dfn_states[start]=cr;
-        cr++;
-        while (!queue.empty())
+        auto [eps,_]=eClousure(cs[i],false);
+        for(int i:eps) cs.push_back(i);
+
+        if(is_final_state(cs[i]))    return true;
+    }
+    return false;
+    }
+
+DFA NFA::convertToDFA()
+{
+    std::map<std::set<int>,int> dfn_states={};
+    std::queue<std::set<int>> queue={};
+    std::map<int, std::vector<Transition>> trs={};
+    int cr=0;
+    auto [start,a]=eClousure_set({m_start_state});
+    queue.push(start);
+    dfn_states[start]=cr;
+    cr++;
+    while (!queue.empty())
+    {
+        std::set<int> T=queue.front();
+        for (char sym:m_alphabet)
         {
-            std::set<int> T=queue.front();
-            for (char sym:m_alphabet)
+            if (sym=='$' ||sym=='~') continue;
+            auto [moveSet,useAny]=move(T,sym);
+            auto [u,useAnyE]=eClousure_set(moveSet);
+            if(dfn_states.find(u)==dfn_states.end())
             {
-                if (sym=='$' ||sym=='~') continue;
-                auto [moveSet,useAny]=move(T,sym);
-                auto [u,useAnyE]=eClousure_set(moveSet);
-                if(dfn_states.find(u)==dfn_states.end())
-                {
-                    if (u.size()==0)    dfn_states[u]=-1;
-                    else{
-                        dfn_states[u]=cr;
-                        cr++;
-                    }
-                    
-                    queue.push(u);
-                }
-
-                if(trs.find(dfn_states[T])==trs.end())  trs[dfn_states[T]]={};
-                if(!useAny )
-                    trs[dfn_states[T]].push_back(Transition(sym,{dfn_states[u]},"normal"));
-                else
-                {
-                    trs[dfn_states[T]].push_back(Transition(sym,{dfn_states[u]},"any"));
-                    break;
-                }
-                
-            }
-            queue.pop();
-        }
-
-        std::map<int, TokenType> dfa_final_tokens;
-        std::vector<int> finalStates ={};
-        for (auto pair : dfn_states)
-        {
-            int dfa_state_id = pair.second;
-            TokenType token = UNKNOWN; 
-            for (int state_nfa: pair.first)
-            {
-                
-                if (is_final_state(state_nfa))
-                {
-                    auto t=m_final_token_types[state_nfa];
-                    if(morePriority(t,token))    
-                    {
-                        token=t;
-                    }
-
-                    finalStates.push_back(pair.second);
-                }
-            }
-
-            dfa_final_tokens[dfa_state_id]=token;
-
-        }
-        std::set<char> d_al=m_alphabet;
-        if(d_al.find('$')==d_al.end())  d_al.erase('$');
-
-        DFA dfa(0,dfn_states.size(),finalStates,m_alphabet,trs);
-        dfa.m_final_token_types=dfa_final_tokens;
-        return dfa;
-    }
-    
-
-        // factory for regular expressions
-    static NFA emptyRE()
-    {
-        return NFA(0,0,{},{},{});
-    }
-    
-    static NFA epsilonRE()
-    {
-        std::map<int,std::vector<Transition>> tras={};
-        tras[0]={Transition('$',{1},"epsilon")};
-        return NFA(0,2,{1},{'$'},tras);
-    }
-    
-    static NFA anyRE()
-    {
-        std::map<int,std::vector<Transition>> tras={};
-        tras[0]={Transition('~',{1},"any")};
-        return NFA(0,2,{1},{'~'},tras);
-    }
-
-    static NFA symbolRE(char symbol) 
-    {
-        std::map<int,std::vector<Transition>> tras;
-        tras[0]={Transition(symbol,{1},"normal")};
-        std::set<char> alphabet{symbol};
-        return NFA(0, 2, {1}, alphabet, tras);
-    }
-
-    static NFA RangeRE(char from,char to)
-    {
-        
-        int start = 0;
-        int end = to-from+2;
-        std::set<char> alpha={};
-        std::map<int,std::vector<Transition>> t={};
-        int state=1;
-        for (char c = from; c <= to; ++c,state++)
-        {
-            alpha.insert(c);
-            t[start].push_back(Transition(c,{state},"normal"));
-            t[state].push_back(Transition('$',{end},"epsilon"));
-
-        } 
-        return NFA(start,to-from+3,{end},alpha,t);
-    }
-
-    static  NFA UnionRE(NFA a1,NFA a2)
-    {
-        int startstate= a1.m_total_states+a2.m_total_states;
-        std::vector<int> finals=a1.m_final_states;
-        int totalstates=a1.m_total_states+a2.m_total_states+2;
-
-        std::set<char> alphabet=a1.m_alphabet;
-        alphabet.merge(a2.m_alphabet);
-
-        std::map<int, std::vector<Transition>> final_transitions={};
-        final_transitions=a1.m_transitions;
-        for (auto [state,transition]: a2.m_transitions)
-        {
-            int new_state=state+a1.m_total_states;
-            for (auto t: transition)
-            {
-                auto new_T=t;
-                for (size_t i = 0; i < new_T.to.size(); i++)
-                {
-                        new_T.to[i]+=a1.m_total_states;
+                if (u.size()==0)    dfn_states[u]=-1;
+                else{
+                    dfn_states[u]=cr;
+                    cr++;
                 }
                 
-                final_transitions[new_state].push_back(new_T);
+                queue.push(u);
             }
-        }
 
-        if(alphabet.find('$')==alphabet.end())
-        {
-            alphabet.insert('$');
+            if(trs.find(dfn_states[T])==trs.end())  trs[dfn_states[T]]={};
+            if(!useAny )
+                trs[dfn_states[T]].push_back(Transition(sym,{dfn_states[u]},"normal"));
+            else
+            {
+                trs[dfn_states[T]].push_back(Transition(sym,{dfn_states[u]},"any"));
+                break;
+            }
+            
         }
-
-        final_transitions[startstate]= { Transition( '$',{a1.m_start_state,a2.m_start_state+a1.m_total_states},"epsilon")};
-
-        auto final_token_types=a1.m_final_token_types;
-        for (auto pair: a2.m_final_token_types)
-        {
-            final_token_types[pair.first+a1.m_total_states]=pair.second;
-        }
-
-        for (int fs: a2.m_final_states)
-        {
-            finals.push_back(fs+a1.m_total_states);
-        }
-        
-        NFA res(startstate,totalstates,finals,alphabet,final_transitions);
-        res.m_final_token_types=final_token_types;
-        return res;
+        queue.pop();
     }
 
-    static NFA ConcatenationRE(NFA a1,NFA a2)
+    std::map<int, TokenType> dfa_final_tokens;
+    std::vector<int> finalStates ={};
+    for (auto pair : dfn_states)
     {
-        int startstate= a1.m_start_state;
-        int totalstates=a1.m_total_states+a2.m_total_states;
-
-        std::set<char> alphabet=a1.m_alphabet;
-        alphabet.merge(a2.m_alphabet);
-
-        std::vector<int>final_states={};
-        for (int fs:a2.m_final_states)
+        int dfa_state_id = pair.second;
+        TokenType token = UNKNOWN; 
+        for (int state_nfa: pair.first)
         {
-            final_states.push_back(fs+a1.m_total_states);
-        }
-
-        std::map<int, std::vector<Transition>> final_transitions={};
-        final_transitions=a1.m_transitions;
-
-        for (auto [state,a2_transitions]: a2.m_transitions)
-        {
-            int new_state=state+a1.m_total_states;
-            for (auto a2_t: a2_transitions)
+            
+            if (is_final_state(state_nfa))
             {
-                auto  new_T=a2_t;
-                for (size_t i = 0; i < new_T.to.size(); i++)
+                auto t=m_final_token_types[state_nfa];
+                if(morePriority(t,token))    
                 {
-                        new_T.to[i]+=a1.m_total_states;
-                }   
-                final_transitions[new_state].push_back(new_T);
+                    token=t;
+                }
+
+                finalStates.push_back(pair.second);
             }
         }
-        if(alphabet.find('$')==alphabet.end())
-        {
-            alphabet.insert('$');
-        }
-        for (int fs:a1.m_final_states)
-        {
-            final_transitions[fs]={Transition('$',{a2.m_start_state+a1.m_total_states},"epsilon")};
-        }
 
-        return NFA(startstate,totalstates,final_states,alphabet,final_transitions);
-        
-    }
-
-    static NFA ClousureRE(NFA a1)
-    {
-
-        int startstate=a1.m_total_states;
-        int finalstate=a1.m_total_states+1;
-        int totalStates=a1.m_total_states+2;
-
-        auto transitions=a1.m_transitions;
-        auto alphabet=a1.m_alphabet;
-
-        if(alphabet.find('$')==alphabet.end())
-        {
-            alphabet.insert('$');
-        }
-
-
-        for (int fs : a1.m_final_states)
-        {
-            transitions[fs]={Transition('$',{a1.m_start_state,finalstate},"epsilon")};
-        }
-        transitions[startstate]={Transition('$',{a1.m_start_state,finalstate},"epsilon")};
-
-        return NFA(startstate,totalStates,{finalstate},alphabet,transitions);
+        dfa_final_tokens[dfa_state_id]=token;
 
     }
+    std::set<char> d_al=m_alphabet;
+    if(d_al.find('$')==d_al.end())  d_al.erase('$');
 
-private:
-        
-    std::pair<std::set<int>,bool> eClousure(int state,bool initial)
+    DFA dfa(0,dfn_states.size(),finalStates,m_alphabet,trs);
+    dfa.m_final_token_types=dfa_final_tokens;
+    return dfa;
+}
+
+
+    // factory for regular expressions
+NFA NFA::emptyRE()
+{
+    return NFA(0,0,{},{},{});
+}
+
+NFA NFA::epsilonRE()
+{
+    std::map<int,std::vector<Transition>> tras={};
+    tras[0]={Transition('$',{1},"epsilon")};
+    return NFA(0,2,{1},{'$'},tras);
+}
+
+NFA NFA::anyRE()
+{
+    std::map<int,std::vector<Transition>> tras={};
+    tras[0]={Transition('~',{1},"any")};
+    return NFA(0,2,{1},{'~'},tras);
+}
+
+NFA NFA::symbolRE(char symbol) 
+{
+    std::map<int,std::vector<Transition>> tras;
+    tras[0]={Transition(symbol,{1},"normal")};
+    std::set<char> alphabet{symbol};
+    return NFA(0, 2, {1}, alphabet, tras);
+}
+
+NFA NFA::RangeRE(char from,char to)
+{
+    
+    int start = 0;
+    int end = to-from+2;
+    std::set<char> alpha={};
+    std::map<int,std::vector<Transition>> t={};
+    int state=1;
+    for (char c = from; c <= to; ++c,state++)
     {
-        std::set<int> res={};
-        std::queue<int> pending={};
-        pending.push(state);
-        
-        bool any=false;
-        while(!pending.empty())
+        alpha.insert(c);
+        t[start].push_back(Transition(c,{state},"normal"));
+        t[state].push_back(Transition('$',{end},"epsilon"));
+
+    } 
+    return NFA(start,to-from+3,{end},alpha,t);
+}
+
+NFA NFA::UnionRE(NFA a1,NFA a2)
+{
+    int startstate= a1.m_total_states+a2.m_total_states;
+    std::vector<int> finals=a1.m_final_states;
+    int totalstates=a1.m_total_states+a2.m_total_states+2;
+
+    std::set<char> alphabet=a1.m_alphabet;
+    alphabet.merge(a2.m_alphabet);
+
+    std::map<int, std::vector<Transition>> final_transitions={};
+    final_transitions=a1.m_transitions;
+    for (auto [state,transition]: a2.m_transitions)
+    {
+        int new_state=state+a1.m_total_states;
+        for (auto t: transition)
         {
-            int cr=pending.front();
-            pending.pop();
-
-            if(res.find(cr)!=res.end()) continue;
-
-            auto [epst,useAny]=epsilonTransitions(cr);
-            if(!any)    any=useAny;
-            for(int i:epst)    
+            auto new_T=t;
+            for (size_t i = 0; i < new_T.to.size(); i++)
             {
-                pending.push(i);
+                    new_T.to[i]+=a1.m_total_states;
             }
-            if (!initial && cr==state)   continue;
-            res.insert(cr);
-
+            
+            final_transitions[new_state].push_back(new_T);
         }
-        return {res,any};
+    }
 
+    if(alphabet.find('$')==alphabet.end())
+    {
+        alphabet.insert('$');
+    }
+
+    final_transitions[startstate]= { Transition( '$',{a1.m_start_state,a2.m_start_state+a1.m_total_states},"epsilon")};
+
+    auto final_token_types=a1.m_final_token_types;
+    for (auto pair: a2.m_final_token_types)
+    {
+        final_token_types[pair.first+a1.m_total_states]=pair.second;
+    }
+
+    for (int fs: a2.m_final_states)
+    {
+        finals.push_back(fs+a1.m_total_states);
     }
     
-    std::pair<std::set<int>,bool> move(std::set<int>set,char symbol)
-    {
-        std::set<int> res={};
+    NFA res(startstate,totalstates,finals,alphabet,final_transitions);
+    res.m_final_token_types=final_token_types;
+    return res;
+}
 
-        bool use_any=false;
-        for (int state: set)
-        {
-            auto [s,any]=nextStates(symbol,state,true);
-            if(!use_any)    use_any=any;
-            for (int i :s){
-                res.insert(i);
-            }
-        }
-        return {res,use_any};
-    }
-    
-    std::pair<std::set<int>,bool>   eClousure_set(std::set<int> set)
+NFA NFA::ConcatenationRE(NFA a1,NFA a2)
+{
+    int startstate= a1.m_start_state;
+    int totalstates=a1.m_total_states+a2.m_total_states;
+
+    std::set<char> alphabet=a1.m_alphabet;
+    alphabet.merge(a2.m_alphabet);
+
+    std::vector<int>final_states={};
+    for (int fs:a2.m_final_states)
     {
-        std::set<int> res={};
-        bool any=false;
-        for (int st: set)
+        final_states.push_back(fs+a1.m_total_states);
+    }
+
+    std::map<int, std::vector<Transition>> final_transitions={};
+    final_transitions=a1.m_transitions;
+
+    for (auto [state,a2_transitions]: a2.m_transitions)
+    {
+        int new_state=state+a1.m_total_states;
+        for (auto a2_t: a2_transitions)
         {
-            auto [eclo,useany]=eClousure(st,true);
-            if(!any)    any=useany;
-            for (int i : eclo)
+            auto  new_T=a2_t;
+            for (size_t i = 0; i < new_T.to.size(); i++)
             {
-                res.insert(i);
-            }
-
+                    new_T.to[i]+=a1.m_total_states;
+            }   
+            final_transitions[new_state].push_back(new_T);
         }
-        return {res,any};
     }
-    
-    std::pair<std::vector<int>,bool> epsilonTransitions(int state) const 
+    if(alphabet.find('$')==alphabet.end())
     {
-        return nextStates('$',state,false);
+        alphabet.insert('$');
+    }
+    for (int fs:a1.m_final_states)
+    {
+        final_transitions[fs]={Transition('$',{a2.m_start_state+a1.m_total_states},"epsilon")};
     }
 
-};
+    return NFA(startstate,totalstates,final_states,alphabet,final_transitions);
     
+}
 
+NFA NFA::ClousureRE(NFA a1)
+{
+
+    int startstate=a1.m_total_states;
+    int finalstate=a1.m_total_states+1;
+    int totalStates=a1.m_total_states+2;
+
+    auto transitions=a1.m_transitions;
+    auto alphabet=a1.m_alphabet;
+
+    if(alphabet.find('$')==alphabet.end())
+    {
+        alphabet.insert('$');
+    }
+
+
+    for (int fs : a1.m_final_states)
+    {
+        transitions[fs]={Transition('$',{a1.m_start_state,finalstate},"epsilon")};
+    }
+    transitions[startstate]={Transition('$',{a1.m_start_state,finalstate},"epsilon")};
+
+    return NFA(startstate,totalStates,{finalstate},alphabet,transitions);
+
+}
+
+    
+std::pair<std::set<int>,bool> NFA::eClousure(int state,bool initial)
+{
+    std::set<int> res={};
+    std::queue<int> pending={};
+    pending.push(state);
+    
+    bool any=false;
+    while(!pending.empty())
+    {
+        int cr=pending.front();
+        pending.pop();
+
+        if(res.find(cr)!=res.end()) continue;
+
+        auto [epst,useAny]=epsilonTransitions(cr);
+        if(!any)    any=useAny;
+        for(int i:epst)    
+        {
+            pending.push(i);
+        }
+        if (!initial && cr==state)   continue;
+        res.insert(cr);
+
+    }
+    return {res,any};
+
+}
+
+std::pair<std::set<int>,bool> NFA::move(std::set<int>set,char symbol)
+{
+    std::set<int> res={};
+
+    bool use_any=false;
+    for (int state: set)
+    {
+        auto [s,any]=nextStates(symbol,state,true);
+        if(!use_any)    use_any=any;
+        for (int i :s){
+            res.insert(i);
+        }
+    }
+    return {res,use_any};
+}
+
+std::pair<std::set<int>,bool> NFA::eClousure_set(std::set<int> set)
+{
+    std::set<int> res={};
+    bool any=false;
+    for (int st: set)
+    {
+        auto [eclo,useany]=eClousure(st,true);
+        if(!any)    any=useany;
+        for (int i : eclo)
+        {
+            res.insert(i);
+        }
+
+    }
+    return {res,any};
+}
+
+std::pair<std::vector<int>,bool> NFA::epsilonTransitions(int state) const 
+{
+    return nextStates('$',state,false);
+}

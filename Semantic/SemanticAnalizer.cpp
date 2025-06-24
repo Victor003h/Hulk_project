@@ -1,7 +1,5 @@
-#include "TypeCollectorVisitor.cpp"
-#include "TypeBuilderVisitor.cpp"
-#include "VariableDefinedVisitor.cpp"
-#include "FunctionCollectorVisitor.cpp"
+#include "../include/Semantic/FunctionCollectorVisitor.hpp"
+#include"../include/Semantic/VariableDefindedVisitor.hpp"
 #include "../common/Error.hpp"
 
 

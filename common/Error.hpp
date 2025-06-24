@@ -1,6 +1,6 @@
 #pragma once
 #include <string>
-#include "../Lexer/Token.h"
+#include "../include/Lexer/Token.hpp"
 
 using namespace std;
 

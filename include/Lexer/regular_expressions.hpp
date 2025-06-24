@@ -1,11 +1,9 @@
+#pragma once
 #include <memory>
 #include <set>
 #include <string>
-#include <map>
-#include <vector>
-#include <iostream>
-#include "FA.cpp" 
-
+#include "Token.hpp"
+#include "NFA.hpp"
 enum class REKind {
     Empty, Epsilon, Symbol, Union, Concat, Clousure,Range,Any
 };
@@ -28,7 +26,7 @@ class EmptyRE : public RE {
 public:
     EmptyRE() : RE({}) {}
     bool is_valid(const std::string& inp) const override {
-        return ConvertToNFA().evualuate(inp);
+        return ConvertToNFA().evaluate(inp);
     }
     NFA ConvertToNFA() const override {
         return NFA::emptyRE();
@@ -39,7 +37,7 @@ class EpsilonRE : public RE {
 public:
     EpsilonRE() : RE({'$'}) {}
     bool is_valid(const std::string& inp) const override {
-        return ConvertToNFA().evualuate(inp);
+        return ConvertToNFA().evaluate(inp);
     }
     NFA ConvertToNFA() const override {
         return NFA::epsilonRE();
@@ -50,7 +48,7 @@ class AnyRE : public RE {
 public:
     AnyRE() : RE({'~'}) {}
     bool is_valid(const std::string& inp) const override {
-        return ConvertToNFA().evualuate(inp);
+        return ConvertToNFA().evaluate(inp);
     }
     NFA ConvertToNFA() const override {
         return NFA::anyRE();
@@ -63,7 +61,7 @@ class SymbolRE : public RE {
 public:
     SymbolRE(char symbol) : RE({symbol}), symbol(symbol) {}
     bool is_valid(const std::string& inp) const override {
-        return ConvertToNFA().evualuate(inp);
+        return ConvertToNFA().evaluate(inp);
     }
     NFA ConvertToNFA() const override {
         return NFA::symbolRE(symbol);
@@ -79,7 +77,7 @@ public:
         alphabet.insert(right->alphabet.begin(), right->alphabet.end());
     }
     bool is_valid(const std::string& inp) const override {
-        return ConvertToNFA().evualuate(inp);
+        return ConvertToNFA().evaluate(inp);
     }
     NFA ConvertToNFA() const override {
         return NFA::UnionRE(left->ConvertToNFA(), right->ConvertToNFA());
@@ -95,7 +93,7 @@ public:
         alphabet.insert(right->alphabet.begin(), right->alphabet.end());
     }
     bool is_valid(const std::string& inp) const override {
-        return ConvertToNFA().evualuate(inp);
+        return ConvertToNFA().evaluate(inp);
     }
     NFA ConvertToNFA() const override {
         return NFA::ConcatenationRE(left->ConvertToNFA(), right->ConvertToNFA());
@@ -107,7 +105,7 @@ class ClousureRE : public RE {
 public:
     ClousureRE(REPtr val) : RE(val->alphabet), value(std::move(val)) {}
     bool is_valid(const std::string& inp) const override {
-        return ConvertToNFA().evualuate(inp);
+        return ConvertToNFA().evaluate(inp);
     }
     NFA ConvertToNFA() const override {
         return NFA::ClousureRE(value->ConvertToNFA());
@@ -127,7 +125,7 @@ public:
     }
 
     bool is_valid(const std::string& inp) const override {
-        return ConvertToNFA().evualuate(inp);
+        return ConvertToNFA().evaluate(inp);
     }
     NFA ConvertToNFA() const override {
         return NFA::RangeRE(from,to);

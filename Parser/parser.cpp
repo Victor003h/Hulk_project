@@ -1,4 +1,4 @@
-#include "grammar.h"
+#include "../include/Parser/grammar.hpp"
 
 class Parser
 {
@@ -11,7 +11,7 @@ public:
 public:
     Parser( ErrorHandler& errorHandler,std::string filegrammar="grammar.txt"):errorHandler(errorHandler)
     {
-        m_grammar= Grammar::loadGrammar(filegrammar);;
+        m_grammar= Grammar::loadGrammar(filegrammar);
         errorHandler=m_grammar.errorHandler;
 
     }

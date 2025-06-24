@@ -3,9 +3,10 @@
 #include <sstream>
 #include <string>
 #include "./Parser/parser.cpp"
+#include "./Parser/AstBuilderVisitor.cpp"
 #include "./Lexer/Lexer.cpp"
 #include "./Semantic/SemanticAnalizer.cpp"
-#include "./CodeGen/CodeGenerationContext.hpp"
+#include "./include/CodeGen/CodeGenerationContext.hpp"
 
 int main() {
 
@@ -32,6 +33,8 @@ int main() {
     }
 
 
+    auto grs=Grammar::loadGrammar("grammar.txt");
+    int x=3;
      Parser parser(error);
      auto cst= parser.parse(tokens);
     if(cst==nullptr || parser.errorHandler.hasErrors())

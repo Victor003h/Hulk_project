@@ -1,8 +1,6 @@
-#include "../Parser/AstNodes.h"
-#include "llvm/IR/Value.h"
+#pragma once
+#include "../../common/AstNodes.hpp"
 #include "CodeGenerationContext.hpp"
-
-
 
 
 class LlvmVisitor:public Visitor
@@ -11,6 +9,7 @@ public:
     CodeGenerationContext &cgContext;
     llvm::Value* lastValue;
     llvm::Function* currentFunction;
+    std::string currentMethodName;
 
     LlvmVisitor(CodeGenerationContext &cgContext)
     : cgContext(cgContext),lastValue(nullptr){}

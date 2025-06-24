@@ -3,7 +3,7 @@
 #include <iostream>
 #include <map>
 #include "../common/Error.hpp"
-#include "regexParser.cpp"
+#include "../include/Lexer/regexParser.hpp"
 #include <cctype>
 
 class Lexer{
@@ -104,7 +104,7 @@ public:
             nfa= NFA::UnionRE(nfa,nfas[i]);
         }
         finaldfa=nfa.convertToDFA();
-                                    
+                 
     }
 
     std::vector<Token> scanTokens(std::string inp)
